@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+python-multipart
+torch
+torchaudio
+transformers
+pyannote.audio
+pydub
+tqdm
+python-dotenv
+numpy

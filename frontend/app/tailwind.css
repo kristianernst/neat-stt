@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Enhanced breathing animation */
+@keyframes breathe {
+  0%, 100% {
+    background-position: 0% 50%;
+    background-size: 200% 200%;
+  }
+  50% {
+    background-position: 100% 50%;
+    background-size: 180% 180%;
+  }
+}
+
+/* Enhanced floating animation */
+@keyframes float {
+  0% {
+    transform: translate(-50%, -50%) translateY(0px);
+    filter: drop-shadow(0 10px 15px rgba(59, 130, 246, 0.1));
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-5px);
+    filter: drop-shadow(0 20px 25px rgba(59, 130, 246, 0.2));
+  }
+  100% {
+    transform: translate(-50%, -50%) translateY(0px);
+    filter: drop-shadow(0 10px 15px rgba(59, 130, 246, 0.1));
+  }
+}
+
+/* Text gradient animation */
+@keyframes textShine {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.breathing-background {
+  background: linear-gradient(135deg, 
+    #1a1a1a 0%,    /* Charcoal */
+    #1e1e1e 35%,   /* VS Code-like */
+    #252525 65%,   /* Slightly lighter */
+    #1a1a1a 100%
+  );
+  background-size: 200% 200%;
+  animation: breathe 12s ease-in-out infinite;
+  position: relative;
+}
+
+.breathing-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background: 
+    linear-gradient(to bottom,
+      rgba(0, 0, 0, 0.3),
+      rgba(0, 0, 0, 0.1)
+    ),
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(255, 255, 255, 0.03),
+      transparent 70%
+    );
+  pointer-events: none;
+}
+
+/* Utility classes */
+.glass-effect {
+  backdrop-filter: blur(12px);
+  background-color: rgba(45, 45, 45, 0.4);
+  border: 1px solid rgba(64, 64, 64, 0.5);
+}
+
+.gradient-text {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(
+    135deg,
+    #ff7eb3 0%,     /* Coral pink */
+    #ff758c 25%,    /* Lighter coral */
+    #e056fd 50%,    /* Bright purple */
+    #8957ff 75%,    /* Deep purple */
+    #6366f1 100%    /* Indigo */
+  );
+  background-size: 200% auto;
+  /* animation: textShine 4s linear infinite; */
+}
+
+.hover-glow {
+  transition-property: all;
+  transition-duration: 300ms;
+}
+
+.hover-glow:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.25);
+}
+
+.card {
+  border-radius: 0.75rem;
+  backdrop-filter: blur(12px);
+  background-color: rgba(45, 45, 45, 0.4);
+  border: 1px solid rgba(64, 64, 64, 0.5);
+  transition-property: all;
+  transition-duration: 300ms;
+}
+
+.input-field {
+  background-color: rgba(31, 41, 55, 0.5);
+  border: 1px solid rgb(55, 65, 81);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  transition-property: all;
+  transition-duration: 300ms;
+}
+
+.input-field:focus {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) rgba(59, 130, 246, 0.5);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition-property: all;
+  transition-duration: 300ms;
+  background-image: linear-gradient(to right, #ff758c, #8957ff);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.button:hover {
+  background-image: linear-gradient(to right, #ff7eb3, #6366f1);
+  box-shadow: 0 20px 25px -5px rgba(147, 51, 234, 0.25);
+}
+
+.button:active {
+  background-image: linear-gradient(to right, #ff6b6b, #7c4dff);
+}

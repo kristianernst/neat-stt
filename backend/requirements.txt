@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+torch
+torchaudio
+transformers
+pyannote.audio
+pydub
+tqdm
+python-dotenv
+numpy
+sse-starlette==0.10.2
