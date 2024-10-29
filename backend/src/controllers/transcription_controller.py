@@ -1,5 +1,4 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from fastapi.responses import JSONResponse
 from ..models import TranscriptionResponse, HealthResponse
 from ..hf_tts import HuggingFaceSTT
 import os
@@ -7,12 +6,11 @@ import tempfile
 from typing import Optional
 import logging
 
-
 class TranscriptionController:
   def __init__(self):
     self.router = APIRouter()
     self.logger = logging.getLogger(self.__class__.__name__)
-    self.transcriber = HuggingFaceSTT(model=os.getenv("MODEL_ID", "openai/whisper-large-v3"), device="infer", verbose=True)
+    self.transcriber = HuggingFaceSTT(verbose=True)
 
     # Register routes
     self.router.post("/transcribe", response_model=TranscriptionResponse)(self.transcribe_audio)

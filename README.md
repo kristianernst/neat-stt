@@ -25,6 +25,8 @@ A modern speech-to-text (STT) service with a sleek frontend built using Remix an
 - PyAnnote - Speaker diarization
 - PyTorch - Machine learning framework
 
+![ui](./assets/ui.png)
+
 ## Getting Started 🚀
 
 ### Prerequisites

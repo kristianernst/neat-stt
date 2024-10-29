@@ -8,11 +8,10 @@ import logging
 from typing import Optional, Dict, List, Tuple
 from pyannote.audio import Pipeline
 import torchaudio
-from dotenv import load_dotenv
-import numpy as np
-import asyncio
 
-load_dotenv()
+from .config import MODEL_ID, HF_TOKEN, DIARIZATION_MODEL, MAX_CHUNK_LENGTH_MS, MIN_CHUNK_LENGTH_MS
+
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -40,8 +39,8 @@ class HuggingFaceSTT:
 
   def __init__(
     self,
-    model: Optional[str] = "openai/whisper-large-v3",
-    language: str = "english",
+    model: Optional[str] = MODEL_ID,
+    language: Optional[str] = None,
     device: Optional[str] = "infer",
     input_file: Optional[str] = None,
     batch_size: int = 1,
@@ -52,8 +51,8 @@ class HuggingFaceSTT:
     Initialize the HuggingFaceSTT class.
 
     Args:
-        model (Optional[str]): The Whisper model to use for transcription.
-        language (str): The language of the audio for transcription.
+        model (str): The Whisper model to use for transcription.
+        language (Optional[str]): The language of the audio for transcription.
         device (Optional[str]): The device to run the models on (cuda, mps, cpu, or infer).
         input_file (Optional[str]): Path to the input audio file.
         batch_size (int): Batch size for processing.
@@ -99,8 +98,8 @@ class HuggingFaceSTT:
     """
     self.logger.info("Initializing diarization model ...")
     self.diarization_model = Pipeline.from_pretrained(
-      os.getenv("DIARIZATION_MODEL"),
-      use_auth_token=os.getenv("HF_TOKEN"),
+      DIARIZATION_MODEL,
+      use_auth_token=HF_TOKEN,
     ).to(torch.device(self.device))
 
   def read_audio(self, input_file: str) -> Tuple[torch.Tensor, int]:
@@ -261,8 +260,8 @@ class HuggingFaceSTT:
       input_file = self.input_file
 
     # Constants for chunk size control
-    MAX_CHUNK_LENGTH = int(os.getenv("MAX_CHUNK_LENGTH", 15000))  # 15 seconds in ms
-    MIN_CHUNK_LENGTH = int(os.getenv("MIN_CHUNK_LENGTH", 1000))  # 1 second in ms
+    MAX_CHUNK_LENGTH = int(MAX_CHUNK_LENGTH_MS)  # 15 seconds in ms
+    MIN_CHUNK_LENGTH = int(MIN_CHUNK_LENGTH_MS)  # 1 second in ms
 
     # Read audio for both transcription and diarization
     waveform, sample_rate = self.read_audio(input_file)
@@ -423,7 +422,7 @@ class HuggingFaceSTT:
 
 if __name__ == "__main__":
   gena = HuggingFaceSTT(
-    model=os.getenv("MODEL_ID"),
+    model=MODEL_ID,
     language="danish",
     device="infer",
     num_speakers=2,  # Specify the number of speakers if known
