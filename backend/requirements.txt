@@ -10,3 +10,4 @@ tqdm
 python-dotenv
 numpy
 sse-starlette==0.10.2
+noisereduce==3.0.3
