@@ -1,13 +1,16 @@
 import os
 import time
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Generator
 
 
 from tqdm import tqdm
 from pydub import AudioSegment
 import torch
+import torch.nn.functional as F
+import numpy as np
+import wave
 
-from src.audio.preprocess import read_audio, load_audio_segment
+from src.audio.preprocess import read_audio, load_audio_segment, read_audio_from_numpy
 from src.audio.diarization import DiarizationProcessor
 from src.audio.transcription import TranscriptionProcessor
 from src.audio.utils import merge_segments, format_transcription_output
@@ -17,6 +20,7 @@ from src.configuration.environment import (
     MIN_CHUNK_LENGTH_MS,
 )
 from src.configuration.log import get_logger
+from src.audio.recorder import AudioRecorder
 
 class SpeechToText:
     """
@@ -29,7 +33,7 @@ class SpeechToText:
         language: Optional[str] = None,
         device: Optional[str] = "infer",
         input_file: Optional[str] = None,
-        batch_size: int = 32,
+        batch_size: int = 16,
         num_speakers: Optional[int] = None,
         verbose: bool = False,
     ):
@@ -275,118 +279,141 @@ class SpeechToText:
             transcribed_segments.extend(batch_transcriptions)
 
         return transcribed_segments
+
+    def transcribe_live(self, chunk_duration_ms: int = 5000, save_debug: bool = True) -> Generator[Dict[str, Any], None, None]:
+        """
+        Perform live transcription with speaker diarization.
+        
+        Args:
+            chunk_duration_ms: Duration of each audio chunk to process in milliseconds
+            save_debug: If True, saves debug recordings
+        
+        Yields:
+            Dict containing transcription results with speaker information
+        """
+        self.logger.info("Starting live transcription...")
+        
+        # Create debug directory if needed
+        if save_debug:
+            debug_dir = "debug_recordings"
+            os.makedirs(debug_dir, exist_ok=True)
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            raw_file = wave.open(f"{debug_dir}/raw_recording_{timestamp}.wav", 'wb')
+            raw_file.setnchannels(1)
+            raw_file.setsampwidth(2)  # For int16
+            raw_file.setframerate(16000)
+            
+            processed_file = wave.open(f"{debug_dir}/processed_recording_{timestamp}.wav", 'wb')
+            processed_file.setnchannels(1)
+            processed_file.setsampwidth(2)
+            processed_file.setframerate(16000)
+        
+        # Initialize audio recorder with matching sample rate
+        recorder = AudioRecorder(sample_rate=16000)
+        recorder.start_recording()
+        
+        try:
+            buffer = []
+            buffer_duration_ms = 0
+            
+            while True:
+                # Get audio chunk
+                chunk = recorder.get_audio_chunk(timeout=0.1)
+                if chunk is None:
+                    continue
+                
+                # Save raw audio if debugging (keep as int16)
+                if save_debug:
+                    raw_file.writeframes(chunk.tobytes())
+                
+                # Add to buffer (keep as int16)
+                buffer.append(chunk)
+                buffer_duration_ms += (len(chunk) * 1000) / recorder.sample_rate
+                
+                # Process buffer when it reaches desired duration
+                if buffer_duration_ms >= chunk_duration_ms:
+                    # Combine buffer chunks
+                    audio_data = np.concatenate(buffer)
+                    
+                    # Save processed chunk if debugging
+                    if save_debug:
+                        processed_file.writeframes(audio_data.tobytes())
+                    
+                    # Convert to torch tensor with proper shape (channel, time)
+                    waveform = torch.from_numpy(audio_data).float() / 32768.0
+                    waveform = waveform.unsqueeze(0)  # Add channel dimension
+                    
+                    # Perform diarization
+                    diarization = self.diarization_processor.perform_diarization(
+                        waveform, recorder.sample_rate
+                    )
+                    segments = self.diarization_processor.process_diarization_segments(diarization)
+                    
+                    # Create AudioSegment for transcription
+                    audio_segment = AudioSegment(
+                        audio_data.tobytes(),
+                        frame_rate=recorder.sample_rate,
+                        sample_width=2,  # int16
+                        channels=1
+                    )
+                    
+                    # Process each diarization segment
+                    for segment, _, speaker in segments:
+                        start_ms = int(segment.start * 1000)
+                        end_ms = int(segment.end * 1000)
+                        
+                        # Extract segment from audio
+                        segment_audio = audio_segment[start_ms:end_ms]
+                        
+                        # Transcribe segment
+                        result = self.transcription_processor.transcribe_chunk(
+                            start_time=segment.start,
+                            end_time=segment.end,
+                            speaker=speaker,
+                            waveform=segment_audio,
+                            sample_rate=recorder.sample_rate
+                        )
+                        yield result
+                    
+                    # Keep a small overlap for context
+                    overlap_ms = 500
+                    if buffer_duration_ms > overlap_ms:
+                        samples_to_keep = int((overlap_ms * recorder.sample_rate) / 1000)
+                        buffer = [buffer[-1][-samples_to_keep:]]
+                        buffer_duration_ms = overlap_ms
+                    else:
+                        buffer = []
+                        buffer_duration_ms = 0
+                    
+        except KeyboardInterrupt:
+            self.logger.info("Stopping live transcription...")
+        finally:
+            recorder.stop_recording()
+            if save_debug:
+                raw_file.close()
+                processed_file.close()
+
+if __name__ == "__main__":
+    try:
+        # Initialize SpeechToText
+        stt = SpeechToText(
+            language="english",
+            num_speakers=2
+        )
+        
+        print("Starting live transcription... Press Ctrl+C to stop")
+        print("=" * 50)
+        
+        # Process live audio with transcription and save debug recordings
+        for result in stt.transcribe_live(chunk_duration_ms=5000, save_debug=True):
+            speaker = f"Speaker {result['speaker']}"
+            text = result['text'].strip()
+            if text:
+                print(f"\n[{speaker}]: {text}")
+                
+    except KeyboardInterrupt:
+        print("\nStopping transcription...")
+    except Exception as e:
+        print(f"Error: {str(e)}")
+
     
-    # def _process_diarization_segments(
-    #     self,
-    #     diarization_segments: List[Any],
-    #     audio: AudioSegment,
-    #     frame_rate: int,
-    #     max_chunk_length: int,
-    #     min_chunk_length: int,
-    # ) -> List[Dict[str, Any]]:
-    #     """
-    #     Process diarization segments and transcribe the audio accordingly.
-    #     """
-    #     transcribed_segments = []
-    #     current_segment = None
-
-    #     for turn, _, speaker in tqdm(diarization_segments):
-    #         start_ms = int(turn.start * 1000)
-    #         end_ms = int(turn.end * 1000)
-    #         duration = end_ms - start_ms
-
-    #         # Handle segments shorter than MIN_CHUNK_LENGTH
-    #         if duration < min_chunk_length:
-    #             if current_segment and current_segment["speaker"] == speaker:
-    #                 # Merge with previous segment
-    #                 current_segment["end_ms"] = end_ms
-    #                 current_segment["duration"] += duration
-    #             elif current_segment:
-    #                 # Process previous segment if it exists
-    #                 if current_segment["duration"] >= min_chunk_length:
-    #                     chunk = audio[current_segment["start_ms"] : current_segment["end_ms"]]
-    #                     segment = self.transcription_processor.transcribe_chunk(
-    #                         chunk,
-    #                         current_segment["start_ms"] / 1000,
-    #                         current_segment["end_ms"] / 1000,
-    #                         current_segment["speaker"],
-    #                         frame_rate,
-    #                     )
-    #                     transcribed_segments.append(segment)
-    #                 # Start new segment
-    #                 current_segment = {
-    #                     "start_ms": start_ms,
-    #                     "end_ms": end_ms,
-    #                     "duration": duration,
-    #                     "speaker": speaker,
-    #                 }
-    #             else:
-    #                 # Start first segment
-    #                 current_segment = {
-    #                     "start_ms": start_ms,
-    #                     "end_ms": end_ms,
-    #                     "duration": duration,
-    #                     "speaker": speaker,
-    #                 }
-    #             continue
-
-    #         # Handle segments longer than MAX_CHUNK_LENGTH
-    #         if duration > max_chunk_length:
-    #             # Process any pending current_segment
-    #             if current_segment:
-    #                 chunk = audio[current_segment["start_ms"] : current_segment["end_ms"]]
-    #                 segment = self.transcription_processor.transcribe_chunk(
-    #                     chunk,
-    #                     current_segment["start_ms"] / 1000,
-    #                     current_segment["end_ms"] / 1000,
-    #                     current_segment["speaker"],
-    #                     frame_rate,
-    #                 )
-    #                 transcribed_segments.append(segment)
-    #                 current_segment = None
-
-    #             # Split long segment into chunks
-    #             for chunk_start in range(start_ms, end_ms, max_chunk_length):
-    #                 chunk_end = min(chunk_start + max_chunk_length, end_ms)
-    #                 chunk = audio[chunk_start:chunk_end]
-    #                 segment = self.transcription_processor.transcribe_chunk(
-    #                     chunk, chunk_start / 1000, chunk_end / 1000, speaker, frame_rate
-    #                 )
-    #                 transcribed_segments.append(segment)
-    #         else:
-    #             # Normal length segment
-    #             if current_segment:
-    #                 # Process previous segment
-    #                 chunk = audio[current_segment["start_ms"] : current_segment["end_ms"]]
-    #                 segment = self.transcription_processor.transcribe_chunk(
-    #                     chunk,
-    #                     current_segment["start_ms"] / 1000,
-    #                     current_segment["end_ms"] / 1000,
-    #                     current_segment["speaker"],
-    #                     frame_rate,
-    #                 )
-    #                 transcribed_segments.append(segment)
-
-    #             # Process current segment
-    #             chunk = audio[start_ms:end_ms]
-    #             segment = self.transcription_processor.transcribe_chunk(
-    #                 chunk, start_ms / 1000, end_ms / 1000, speaker, frame_rate
-    #             )
-    #             transcribed_segments.append(segment)
-    #             current_segment = None
-
-    #     # Process any remaining segment
-    #     if current_segment and current_segment["duration"] >= min_chunk_length:
-    #         chunk = audio[current_segment["start_ms"] : current_segment["end_ms"]]
-    #         segment = self.transcription_processor.transcribe_chunk(
-    #             chunk,
-    #             current_segment["start_ms"] / 1000,
-    #             current_segment["end_ms"] / 1000,
-    #             current_segment["speaker"],
-    #             frame_rate,
-    #         )
-    #         transcribed_segments.append(segment)
-
-    #     return transcribed_segments
-
-    # # The rest of your methods (e.g., transcribe_folder) can be updated similarly.
