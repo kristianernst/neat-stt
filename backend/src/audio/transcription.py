@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Dict, Any, List, Generator
+from typing import Dict, Any, List, Generator, Tuple
 import traceback
 
 import numpy as np
@@ -127,41 +127,29 @@ class TranscriptionProcessor:
         Stream transcription results word by word.
         """
         try:
-            # Convert audio to samples
-            samples = np.array(chunk.set_frame_rate(frame_rate).set_channels(1).get_array_of_samples())
-            waveform_chunk = torch.from_numpy(samples).float() / (2 ** 15)
+            # Use the existing transcribe_chunk method
+            result = self.transcribe_chunk(chunk, start_time, end_time, speaker, frame_rate)
             
-            # Extract features
-            input_features = self.processor.feature_extractor(
-                waveform_chunk.numpy(), sampling_rate=frame_rate, return_tensors="pt"
-            ).input_features.to(self.device)
+            # Split the transcription into words if needed
+            words = result["text"].split()
+            if not words:
+                return
+                
+            # Calculate timing for each word
+            word_duration = (end_time - start_time) / len(words)
             
-            # Generate transcription with word timestamps
-            with torch.inference_mode():
-                result = self.model.generate(
-                    input_features,
-                    language=self.language,
-                    task="transcribe",
-                    return_timestamps=True,
-                    word_timestamps=True
-                )
+            for i, word in enumerate(words):
+                word_start = start_time + (i * word_duration)
+                word_end = word_start + word_duration
+                logger.info(f"\n\n\nWord: {word}, start={word_start:.2f}s, end={word_end:.2f}s\n\n\n")
                 
-                # Process word by word
-                words_with_timestamps = self.processor.decode(result[0], skip_special_tokens=True).words
-                
-                for word_info in words_with_timestamps:
-                    word = word_info.word
-                    word_start = start_time + word_info.start
-                    word_end = start_time + word_info.end
-                    
-                    yield {
-                        "start": word_start,
-                        "end": word_end,
-                        "text": word,
-                        "speaker": speaker,
-                        "is_word": True  # Flag to indicate this is a word-level result
-                    }
-                    
+                yield {
+                    "start": word_start,
+                    "end": word_end,
+                    "text": word,
+                    "speaker": speaker
+                }
+
         except Exception as e:
             self.logger.error(f"Failed to transcribe streaming chunk: {str(e)}")
             raise TranscriptionError(f"Streaming chunk transcription failed: {str(e)}") from e

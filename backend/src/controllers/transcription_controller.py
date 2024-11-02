@@ -44,6 +44,8 @@ class TranscriptionController:
         
       # Clean up the temporary file
       os.unlink(temp_file.name)
+      
+      self.logger.info(f"Transcription: {transcription}")
 
       return TranscriptionResponse(transcription=transcription)
 
@@ -92,12 +94,12 @@ class TranscriptionController:
                 # Process transcription results
                 for result in transcription_gen:
                     if result and result.get("text", "").strip():
+                        self.logger.info(f"\n\n\nTranscription result: {result}\n\n\n")
                         yield {
                             "event": "transcription",
                             "data": json.dumps(result)
                         }
-                    await asyncio.sleep(0.1)
-                    
+                    await asyncio.sleep(0.02)
             except Exception as e:
                 self.logger.error(f"Live transcription error: {str(e)}")
                 yield {
@@ -122,8 +124,27 @@ class TranscriptionController:
     """
     try:
         self.logger.info("Stopping live transcription...")
-        self.stt.stop_live_transcription()
-        return {"status": "stopped"}
+        # Set a timeout for the stop operation
+        stop_timeout = 3  # seconds
+        
+        def stop_with_timeout():
+            self.stt.stop_live_transcription()
+            
+        # Run stop operation with timeout
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(stop_with_timeout), 
+                timeout=stop_timeout
+            )
+            return {"status": "stopped"}
+        except asyncio.TimeoutError:
+            self.logger.error("Stop operation timed out, forcing stop...")
+            # Force stop if timeout occurs
+            if hasattr(self.stt, 'recorder'):
+                self.stt.recorder = None
+            self.stt.is_running = False
+            return {"status": "force_stopped"}
+            
     except Exception as e:
         self.logger.error(f"Failed to stop live transcription: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

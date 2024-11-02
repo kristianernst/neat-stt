@@ -1,12 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { MetaFunction } from "@remix-run/node";
 import AudioUploader from "~/components/AudioUploader";
-import LiveTranscriptionControl from "~/components/LiveTranscriptionControl";
-import LiveTranscriptionDisplay from "~/components/LiveTranscriptionDisplay";
-import RecordedTranscriptionDisplay from "~/components/RecordedTranscriptionDisplay";
+import TranscriptionControl from "~/components/TranscriptionControl";
+import TranscriptionDisplay from "~/components/TranscriptionDisplay";
 import ConfigArea from "~/components/ConfigArea";
 import AudioPreview from "~/components/AudioPreview";
-import { formatTranscription } from '../utils/transcription-formatter';
 import type { TranscriptionSegment } from '../utils/transcription-formatter';
 
 export const meta: MetaFunction = () => {
@@ -24,8 +22,7 @@ export default function Index() {
   const [numSpeakers, setNumSpeakers] = useState(2);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isDownloadReady, setIsDownloadReady] = useState(false);
-  const [currentSegments, setCurrentSegments] = useState<TranscriptionSegment[]>([]);
+  const [segments, setSegments] = useState<TranscriptionSegment[]>([]);
   const [isStoppingTranscription, setIsStoppingTranscription] = useState(false);
 
   const handleTranscription = async (file: File) => {
@@ -61,6 +58,7 @@ export default function Index() {
   const handleStartLive = () => {
     setIsLiveMode(true);
     setError(null);
+    setSegments([]); // Clear previous segments
   };
 
   const handleStopLive = async () => {
@@ -74,7 +72,6 @@ export default function Index() {
         throw new Error("Failed to stop transcription");
       }
       setIsLiveMode(false);
-      setIsDownloadReady(true);
     } catch (error) {
       console.error("Error stopping transcription:", error);
       setError(error instanceof Error ? error.message : 'Failed to stop transcription');
@@ -83,30 +80,11 @@ export default function Index() {
     }
   };
 
-  const handleDownload = () => {
-    const downloadFormat = window.confirm(
-      'Choose a format:\nOK - Markdown (.md)\nCancel - Plain Text (.txt)'
-    ) ? 'md' : 'txt';
-    
-    const formattedContent = formatTranscription(currentSegments, downloadFormat);
-    const blob = new Blob([formattedContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `transcription.${downloadFormat}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    setIsLiveMode(false);
-    setIsDownloadReady(false);
-  };
-
   const handleClearFile = () => {
     setSelectedFile(null);
     setTranscription("");
     setError(null);
+    setSegments([]);
   };
 
   const handleLanguageChange = useCallback((newLanguage: string) => {
@@ -118,8 +96,15 @@ export default function Index() {
   }, []);
 
   const handleSegmentsUpdate = useCallback((segments: TranscriptionSegment[]) => {
-    setCurrentSegments(segments);
+    setSegments(segments);
   }, []);
+
+  // Clear segments only when switching to live mode or when explicitly clearing transcription
+  useEffect(() => {
+    if (!isLiveMode && !transcription && segments.length > 0) {
+      setSegments([]);
+    }
+  }, [isLiveMode, transcription, segments.length]);
 
   return (
     <div className="min-h-screen breathing-background relative">
@@ -156,14 +141,12 @@ export default function Index() {
                 <div className="text-center">
                   <span className="text-gray-400">or</span>
                 </div>
-                <LiveTranscriptionControl
-                  onStart={handleStartLive}
-                  onStop={handleStopLive}
-                  onDownload={handleDownload}
+                <TranscriptionControl
                   isLiveMode={isLiveMode}
-                  isDownloadReady={isDownloadReady}
                   isDisabled={isLoading}
                   isStoppingTranscription={isStoppingTranscription}
+                  onStartLive={handleStartLive}
+                  onStopLive={handleStopLive}
                 />
               </>
             )}
@@ -175,20 +158,18 @@ export default function Index() {
             </div>
           )}
           
-          <LiveTranscriptionDisplay
+          <TranscriptionDisplay
             isLiveMode={isLiveMode}
             language={language}
             numSpeakers={numSpeakers}
             onSegmentsUpdate={handleSegmentsUpdate}
-            isDownloadReady={isDownloadReady}
-          />
-          
-          <RecordedTranscriptionDisplay
             transcription={transcription}
             isLoading={isLoading}
+            segments={segments}
+            setSegments={setSegments}
           />
         </div>
       </div>
     </div>
   );
-} 
+}
