@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 interface SpeakerCounterProps {
   value: number;
   onChange: (num: number) => void;
@@ -21,7 +23,7 @@ const SpeakerIllustration = ({ count }: { count: number }) => {
     return sizes[count as keyof typeof sizes];
   };
 
-  const generatePositions = () => {
+  const generatePositions = (count: number) => {
     const positions: Array<{ x: number; y: number; id: number; delay: number }> = [];
     const sizePercent = getSizePercent(count);
     const iconRadius = sizePercent / 2;
@@ -80,8 +82,8 @@ const SpeakerIllustration = ({ count }: { count: number }) => {
     return positions;
   };
 
-  const speakers = generatePositions();
-  const sizePercent = getSizePercent(count);
+  const speakers = useMemo(() => generatePositions(count), [count]);
+  const sizePercent = useMemo(() => getSizePercent(count), [count]);
 
   return (
     <div className="absolute inset-0 top-0 bottom-12">

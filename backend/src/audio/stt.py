@@ -52,6 +52,9 @@ class SpeechToText:
         self.diarization_processor = DiarizationProcessor(self.device, self.num_speakers)
         self.transcription_processor = TranscriptionProcessor(self.model, self.device, self.language)
 
+        # Add a flag to control the transcription loop
+        self.is_running = False
+
     def _infer_device(self) -> str:
         """
         Infer the device to use based on availability.
@@ -280,16 +283,16 @@ class SpeechToText:
 
         return transcribed_segments
 
-    def transcribe_live(self, chunk_duration_ms: int = 5000, save_debug: bool = True) -> Generator[Dict[str, Any], None, None]:
+    def transcribe_live(self, chunk_duration_ms: int = 5000, save_debug: bool = False) -> Generator[Dict[str, Any], None, None]:
         """
-        Perform live transcription with speaker diarization.
+        Perform live transcription with speaker diarization with word-by-word output.
         
         Args:
             chunk_duration_ms: Duration of each audio chunk to process in milliseconds
             save_debug: If True, saves debug recordings
         
         Yields:
-            Dict containing transcription results with speaker information
+            Dict containing transcription results with speaker information and word-level timing
         """
         self.logger.info("Starting live transcription...")
         
@@ -300,7 +303,7 @@ class SpeechToText:
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             raw_file = wave.open(f"{debug_dir}/raw_recording_{timestamp}.wav", 'wb')
             raw_file.setnchannels(1)
-            raw_file.setsampwidth(2)  # For int16
+            raw_file.setsampwidth(2)
             raw_file.setframerate(16000)
             
             processed_file = wave.open(f"{debug_dir}/processed_recording_{timestamp}.wav", 'wb')
@@ -309,76 +312,80 @@ class SpeechToText:
             processed_file.setframerate(16000)
         
         # Initialize audio recorder with matching sample rate
-        recorder = AudioRecorder(sample_rate=16000)
-        recorder.start_recording()
+        self.recorder = AudioRecorder(sample_rate=16000, chunk_size=chunk_duration_ms, channels=1)
+        self.recorder.start_recording()
+        
+        self.is_running = True
+        session_start_time = time.time()
         
         try:
             buffer = []
             buffer_duration_ms = 0
+            total_processed_duration = 0
             
-            while True:
-                # Get audio chunk
-                chunk = recorder.get_audio_chunk(timeout=0.1)
+            while self.is_running:
+                chunk = self.recorder.get_audio_chunk(timeout=0.1)
                 if chunk is None:
                     continue
                 
-                # Save raw audio if debugging (keep as int16)
                 if save_debug:
                     raw_file.writeframes(chunk.tobytes())
                 
-                # Add to buffer (keep as int16)
                 buffer.append(chunk)
-                buffer_duration_ms += (len(chunk) * 1000) / recorder.sample_rate
+                chunk_duration = (len(chunk) * 1000) / self.recorder.sample_rate
+                buffer_duration_ms += chunk_duration
                 
-                # Process buffer when it reaches desired duration
                 if buffer_duration_ms >= chunk_duration_ms:
                     # Combine buffer chunks
                     audio_data = np.concatenate(buffer)
                     
-                    # Save processed chunk if debugging
                     if save_debug:
                         processed_file.writeframes(audio_data.tobytes())
                     
-                    # Convert to torch tensor with proper shape (channel, time)
+                    # Convert to torch tensor with proper shape
                     waveform = torch.from_numpy(audio_data).float() / 32768.0
-                    waveform = waveform.unsqueeze(0)  # Add channel dimension
+                    waveform = waveform.unsqueeze(0)
                     
                     # Perform diarization
                     diarization = self.diarization_processor.perform_diarization(
-                        waveform, recorder.sample_rate
+                        waveform, self.recorder.sample_rate
                     )
                     segments = self.diarization_processor.process_diarization_segments(diarization)
                     
                     # Create AudioSegment for transcription
                     audio_segment = AudioSegment(
                         audio_data.tobytes(),
-                        frame_rate=recorder.sample_rate,
-                        sample_width=2,  # int16
+                        frame_rate=self.recorder.sample_rate,
+                        sample_width=2,
                         channels=1
                     )
                     
-                    # Process each diarization segment
+                    # Process each diarization segment with word-by-word transcription
                     for segment, _, speaker in segments:
-                        start_ms = int(segment.start * 1000)
-                        end_ms = int(segment.end * 1000)
+                        abs_start = total_processed_duration + (segment.start * 1000)
+                        abs_end = total_processed_duration + (segment.end * 1000)
                         
-                        # Extract segment from audio
-                        segment_audio = audio_segment[start_ms:end_ms]
+                        segment_audio = audio_segment[
+                            int(segment.start * 1000):int(segment.end * 1000)
+                        ]
                         
-                        # Transcribe segment
-                        result = self.transcription_processor.transcribe_chunk(
-                            start_time=segment.start,
-                            end_time=segment.end,
+                        # Use the new streaming transcription method
+                        for word_result in self.transcription_processor.transcribe_chunk_streaming(
+                            chunk=segment_audio,
+                            start_time=abs_start / 1000,
+                            end_time=abs_end / 1000,
                             speaker=speaker,
-                            waveform=segment_audio,
-                            sample_rate=recorder.sample_rate
-                        )
-                        yield result
+                            frame_rate=self.recorder.sample_rate
+                        ):
+                            yield word_result
+                    
+                    # Update total processed duration
+                    total_processed_duration += buffer_duration_ms
                     
                     # Keep a small overlap for context
                     overlap_ms = 500
                     if buffer_duration_ms > overlap_ms:
-                        samples_to_keep = int((overlap_ms * recorder.sample_rate) / 1000)
+                        samples_to_keep = int((overlap_ms * self.recorder.sample_rate) / 1000)
                         buffer = [buffer[-1][-samples_to_keep:]]
                         buffer_duration_ms = overlap_ms
                     else:
@@ -388,10 +395,21 @@ class SpeechToText:
         except KeyboardInterrupt:
             self.logger.info("Stopping live transcription...")
         finally:
-            recorder.stop_recording()
+            if hasattr(self, 'recorder'):
+                self.recorder.stop_recording()
+                self.recorder = None
             if save_debug:
                 raw_file.close()
                 processed_file.close()
+
+    def stop_live_transcription(self):
+        """
+        Stop the live transcription by setting the flag and stopping the recorder.
+        """
+        self.logger.info("Stopping live transcription...")
+        self.is_running = False  # Set flag to stop the loop
+        if hasattr(self, 'recorder') and self.recorder:
+            self.recorder.stop_recording()
 
 if __name__ == "__main__":
     try:

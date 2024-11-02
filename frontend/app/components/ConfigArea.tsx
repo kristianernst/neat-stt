@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import LanguageSelector from "./LanguageSelector";
 import SpeakerCounter from "./SpeakerCounter";
 
@@ -9,7 +10,7 @@ interface ConfigAreaProps {
   disabled?: boolean;
 }
 
-export default function ConfigArea({
+const ConfigArea = memo(function ConfigArea({
   language,
   onLanguageChange,
   numSpeakers,
@@ -37,4 +38,6 @@ export default function ConfigArea({
       </div>
     </div>
   );
-} 
+});
+
+export default ConfigArea; 
