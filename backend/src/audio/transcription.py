@@ -4,6 +4,7 @@ import traceback
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from pydub import AudioSegment
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 
@@ -45,24 +46,49 @@ class TranscriptionProcessor:
             self.logger.debug(f"Processing chunk: start={start_time:.2f}s, end={end_time:.2f}s, speaker={speaker}")
             
             # Preprocess audio
-            self.logger.debug(f"Converting audio chunk to samples (frame_rate={frame_rate})")
             samples = np.array(chunk.set_frame_rate(frame_rate).set_channels(1).get_array_of_samples())
             waveform_chunk = torch.from_numpy(samples).float() / (2 ** 15)
             
             # Extract features
-            self.logger.debug("Extracting features from audio chunk")
             input_features = self.processor.feature_extractor(
                 waveform_chunk.numpy(), sampling_rate=frame_rate, return_tensors="pt"
             ).input_features.to(self.device)
             
-            # Generate transcription
-            self.logger.debug("Generating transcription")
+            # Generate transcription with logprobs
             with torch.inference_mode():
-                generated_ids = self.model.generate(input_features, language=self.language, task="transcribe")
-                transcription = self.processor.decode(generated_ids[0], skip_special_tokens=True)
+                outputs = self.model.generate(
+                    input_features,
+                    language=self.language,
+                    task="transcribe",
+                    return_dict_in_generate=True,
+                    output_scores=True,
+                    max_new_tokens=256,
+                    num_return_sequences=1,
+                    num_beams=5
+                )
+                
+                # Get logprobs for top tokens
+                logprobs = []
+                for token_scores in outputs.scores:
+                    probs = F.softmax(token_scores[0], dim=-1)
+                    top_probs, top_tokens = probs.topk(20)
+                    top_tokens = [self.processor.decode([t.item()]) for t in top_tokens]
+                    logprobs.append({
+                        'tokens': top_tokens,
+                        'probs': top_probs.tolist()
+                    })
+                
+                # Get the main transcription
+                transcription = self.processor.decode(outputs.sequences[0], skip_special_tokens=True)
             
             self.logger.info(f"Successfully transcribed chunk: {start_time:.2f}s - {end_time:.2f}s")
-            return {"start": start_time, "end": end_time, "text": transcription, "speaker": speaker}
+            return {
+                "start": start_time,
+                "end": end_time,
+                "text": transcription,
+                "speaker": speaker,
+                "logprobs": logprobs
+            }
             
         except Exception as e:
             self.logger.error(f"Failed to transcribe chunk: {str(e)}\n{traceback.format_exc()}")

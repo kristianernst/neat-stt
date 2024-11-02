@@ -21,6 +21,7 @@ from src.configuration.environment import (
 )
 from src.configuration.log import get_logger
 from src.audio.recorder import AudioRecorder
+from src.audio.correction import TranscriptionCorrector
 
 class SpeechToText:
     """
@@ -312,6 +313,9 @@ class SpeechToText:
         recorder = AudioRecorder(sample_rate=16000)
         recorder.start_recording()
         
+        # Initialize corrector
+        corrector = TranscriptionCorrector(device=self.device)
+        
         try:
             buffer = []
             buffer_duration_ms = 0
@@ -373,7 +377,10 @@ class SpeechToText:
                             waveform=segment_audio,
                             sample_rate=recorder.sample_rate
                         )
-                        yield result
+                        
+                        # Apply corrections
+                        corrected_result = corrector.correct_transcription(result)
+                        yield corrected_result
                     
                     # Keep a small overlap for context
                     overlap_ms = 500
