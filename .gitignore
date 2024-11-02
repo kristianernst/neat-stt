@@ -4,4 +4,5 @@ frontend/node_modules
 *.pyc
 *.ruff_cache
 *backend/assets/
+*backend/debug_recordings/*
 test*
