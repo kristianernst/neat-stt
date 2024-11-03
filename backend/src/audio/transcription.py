@@ -25,6 +25,12 @@ class TranscriptionProcessor:
             self.language = language
             self.logger = logger
             self._init_model(model_name)
+            self.model.eval()
+            try:
+                self.logger.info("Compiling model with aot_eager backend")
+                self.model = torch.compile(self.model, backend="aot_eager")
+            except Exception as e:
+                self.logger.warning("Failed to compile model with aot_eager backend, falling back to aot")
         except Exception as e:
             self.logger.error(f"Failed to initialize TranscriptionProcessor: {str(e)}")
             raise TranscriptionError(f"Initialization failed: {str(e)}") from e
@@ -82,9 +88,9 @@ class TranscriptionProcessor:
             batch_samples = []
             for i, chunk in enumerate(chunks):
                 try:
-                    samples = np.array(chunk.set_frame_rate(frame_rate).set_channels(1).get_array_of_samples())
-                    waveform_chunk = torch.from_numpy(samples).float() / (2 ** 15)
-                    batch_samples.append(waveform_chunk.numpy())
+                    samples = np.array(chunk.set_frame_rate(frame_rate).set_channels(1).get_array_of_samples(), dtype=np.float32)
+                    samples = samples / (2 ** 15)  # Normalize
+                    batch_samples.append(samples)
                 except Exception as e:
                     self.logger.error(f"Failed to process chunk {i}: {str(e)}")
                     raise

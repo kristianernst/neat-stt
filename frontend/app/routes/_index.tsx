@@ -5,7 +5,8 @@ import TranscriptionControl from "~/components/TranscriptionControl";
 import TranscriptionDisplay from "~/components/TranscriptionDisplay";
 import ConfigArea from "~/components/ConfigArea";
 import AudioPreview from "~/components/AudioPreview";
-import type { TranscriptionSegment } from '../utils/transcription-formatter';
+import { TranscriptionSegment } from '../utils/transcription-formatter';
+import { processSSEStream } from '~/utils/sseUtils';
 
 export const meta: MetaFunction = () => {
   return [
@@ -24,11 +25,16 @@ export default function Index() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [segments, setSegments] = useState<TranscriptionSegment[]>([]);
   const [isStoppingTranscription, setIsStoppingTranscription] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false); // Indicates transcription in progress
+  const [progress, setProgress] = useState(0); // New state for progress
 
   const handleTranscription = async (file: File) => {
     setSelectedFile(file);
     setIsLoading(true);
+    setIsTranscribing(true);
     setError(null);
+    setSegments([]);
+    setProgress(0);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -41,15 +47,44 @@ export default function Index() {
         body: formData,
       });
 
-      if (!response.ok) {
+      if (!response.ok || !response.body) {
         throw new Error("Failed to transcribe audio");
       }
 
-      const data = await response.text();
-      setTranscription(data);
+      await processSSEStream(response.body, (eventType, eventData) => {
+        switch (eventType) {
+          case "ready":
+            setIsLoading(false);
+            break;
+          case "transcription":
+            setSegments(prev => {
+              // If this is an update to the last segment, replace it
+              if (prev.length > 0 && prev[prev.length - 1].speaker === eventData.speaker) {
+                const newSegments = [...prev];
+                newSegments[newSegments.length - 1] = eventData;
+                return newSegments;
+              }
+              // Otherwise add as new segment
+              return [...prev, eventData];
+            });
+            break;
+          case "progress":
+            setProgress(eventData.progress);
+            break;
+          case "error":
+            setError(eventData.error);
+            setIsTranscribing(false);
+            break;
+          case "close":
+            setIsTranscribing(false);
+            setProgress(100);
+            break;
+        }
+      });
     } catch (error) {
       console.error("Error:", error);
       setError(error instanceof Error ? error.message : 'Failed to transcribe audio');
+      setIsTranscribing(false);
     } finally {
       setIsLoading(false);
     }
@@ -77,6 +112,7 @@ export default function Index() {
       setError(error instanceof Error ? error.message : 'Failed to stop transcription');
     } finally {
       setIsStoppingTranscription(false);
+      setIsTranscribing(false);
     }
   };
 
@@ -85,6 +121,9 @@ export default function Index() {
     setTranscription("");
     setError(null);
     setSegments([]);
+    setIsTranscribing(false);
+    setProgress(0);
+    setIsLiveMode(false);
   };
 
   const handleLanguageChange = useCallback((newLanguage: string) => {
@@ -99,12 +138,12 @@ export default function Index() {
     setSegments(segments);
   }, []);
 
-  // Clear segments only when switching to live mode or when explicitly clearing transcription
+  // Clear segments when switching modes
   useEffect(() => {
-    if (!isLiveMode && !transcription && segments.length > 0) {
+    if (isLiveMode) {
       setSegments([]);
     }
-  }, [isLiveMode, transcription, segments.length]);
+  }, [isLiveMode]);
 
   return (
     <div className="min-h-screen breathing-background relative">
@@ -167,6 +206,9 @@ export default function Index() {
             isLoading={isLoading}
             segments={segments}
             setSegments={setSegments}
+            isTranscribing={isTranscribing}
+            progress={progress}
+            setProgress={setProgress}
           />
         </div>
       </div>

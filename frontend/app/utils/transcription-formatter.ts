@@ -1,9 +1,9 @@
 interface TranscriptionSegment {
   speaker: string;
   text: string;
-  start?: number;
-  end?: number;
-  timestamp?: string; // Added to accommodate recorded transcriptions
+  start: number;
+  end: number;
+  timestamp?: string;
 }
 
 export type { TranscriptionSegment };

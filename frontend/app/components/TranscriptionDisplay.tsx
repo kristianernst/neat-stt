@@ -1,18 +1,20 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import type { TranscriptionSegment } from '../utils/transcription-formatter';
 import { formatTranscription } from '../utils/transcription-formatter';
-import { FiCopy, FiDownload } from 'react-icons/fi'; // Importing icons from react-icons
+import { FiCopy, FiDownload } from 'react-icons/fi';
 
 interface TranscriptionDisplayProps {
   isLiveMode: boolean;
   language: string;
   numSpeakers: number;
   onSegmentsUpdate?: (segments: TranscriptionSegment[]) => void;
-  isDownloadReady?: boolean;
   transcription: string;
   isLoading: boolean;
   segments: TranscriptionSegment[];
   setSegments: React.Dispatch<React.SetStateAction<TranscriptionSegment[]>>;
+  isTranscribing: boolean;
+  progress: number;
+  setProgress: React.Dispatch<React.SetStateAction<number>>;
 }
 
 export default memo(function TranscriptionDisplay({
@@ -20,28 +22,34 @@ export default memo(function TranscriptionDisplay({
   language,
   numSpeakers,
   onSegmentsUpdate,
-  isDownloadReady,
   transcription,
   isLoading,
   segments,
   setSegments,
+  isTranscribing,
+  progress,
+  setProgress,
 }: TranscriptionDisplayProps) {
   const [isInitializing, setIsInitializing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Scroll to bottom when new segments are added
+  // Smooth scroll to bottom when new segments are added
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
     }
   }, [segments]);
 
   const handleCopy = () => {
     const text = segments.map(segment => {
-      const timestamp = segment.start !== undefined && segment.end !== undefined
-        ? `[${formatTime(segment.start)} -> ${formatTime(segment.end)}]`
-        : segment.timestamp || '';
+      const timestamp =
+        segment.start !== undefined && segment.end !== undefined
+          ? `[${formatTime(segment.start)} -> ${formatTime(segment.end)}]`
+          : segment.timestamp || '';
       return `${timestamp}\n${segment.speaker}: ${segment.text}`;
     }).join('\n');
     navigator.clipboard.writeText(text);
@@ -70,21 +78,32 @@ export default memo(function TranscriptionDisplay({
 
   const handleTranscriptionEvent = useCallback((event: MessageEvent) => {
     const data = JSON.parse(event.data);
+    if (!data) return;
+
     setSegments(prev => {
+      // Check if this is a new speaker or continuation
       if (prev.length > 0 && prev[prev.length - 1].speaker === data.speaker) {
         const newSegments = [...prev];
         const lastSegment = { ...newSegments[newSegments.length - 1] };
-        lastSegment.text = `${lastSegment.text} ${data.text}`;
+        lastSegment.text = `${lastSegment.text} ${data.text}`.trim();
         lastSegment.end = data.end;
         newSegments[newSegments.length - 1] = lastSegment;
         onSegmentsUpdate?.(newSegments);
         return newSegments;
       }
+      
       const newSegments = [...prev, data];
       onSegmentsUpdate?.(newSegments);
       return newSegments;
     });
-  }, [onSegmentsUpdate, setSegments]);
+  }, [onSegmentsUpdate]);
+
+  const handleProgressEvent = useCallback((event: MessageEvent) => {
+    const data = event.data ? JSON.parse(event.data) : {};
+    if (data.progress !== undefined) {
+      setProgress(data.progress);
+    }
+  }, [setProgress]);
 
   const handleError = useCallback((error: Event) => {
     console.error('SSE Error:', error);
@@ -105,7 +124,7 @@ export default memo(function TranscriptionDisplay({
   }, []);
 
   useEffect(() => {
-    if (isLiveMode && !isDownloadReady) {
+    if (isLiveMode) {
       setIsInitializing(true);
       const params = new URLSearchParams({
         language,
@@ -134,18 +153,15 @@ export default memo(function TranscriptionDisplay({
         eventSourceRef.current = null;
       }
     };
-  }, [isLiveMode, language, numSpeakers, handleTranscriptionEvent, handleError, handleClose, isDownloadReady]);
+  }, [isLiveMode, language, numSpeakers, handleTranscriptionEvent, handleError, handleClose]);
 
   // When transcription changes (for recorded transcription), parse it into segments
   useEffect(() => {
-    if (!isLiveMode && transcription) {
+    if (!isLiveMode && transcription && segments.length === 0) {
       const parsedSegments = parseTranscription(transcription);
-      if (parsedSegments.length > 0) {
-        setSegments(parsedSegments);
-        onSegmentsUpdate?.(parsedSegments);
-      }
+      setSegments(parsedSegments);
     }
-  }, [isLiveMode, transcription, setSegments, onSegmentsUpdate]);
+  }, [isLiveMode, transcription, segments.length, setSegments]);
 
   const parseTranscription = (transcription: string): TranscriptionSegment[] => {
     if (!transcription) return [];
@@ -160,21 +176,6 @@ export default memo(function TranscriptionDisplay({
     }).filter(Boolean) as TranscriptionSegment[];
   };
 
-  if (isLoading) {
-    // Loading placeholder
-    return (
-      <div className="mt-4 card p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gradient-to-r from-[#ff7eb3]/20 to-[#8957ff]/20 rounded w-3/4"></div>
-          <div className="space-y-2">
-            <div className="h-4 bg-gradient-to-r from-[#ff7eb3]/20 to-[#8957ff]/20 rounded"></div>
-            <div className="h-4 bg-gradient-to-r from-[#ff7eb3]/20 to-[#8957ff]/20 rounded w-5/6"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (isInitializing && isLiveMode) {
     return (
       <div className="mt-4 card p-6 text-center">
@@ -185,7 +186,32 @@ export default memo(function TranscriptionDisplay({
     );
   }
 
+  // Adjusted rendering logic
+  if ((isLoading || isTranscribing) && segments.length === 0) {
+    // Show a loading indicator when transcribing
+    return (
+      <div className="mt-4 card p-6 text-center">
+        <div className="animate-spin w-8 h-8 border-4 border-[#ff7eb3] border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-gray-400">Transcribing...</p>
+        {isTranscribing && (
+          <div className="mt-4">
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div
+                className="bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] h-2 rounded-full transition-all duration-200"
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+            <div className="text-right text-gray-400 text-sm mt-1">
+              {progress.toFixed(1)}% completed
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (!segments || segments.length === 0) {
+    // If there are no segments and not transcribing, don't display anything
     return null;
   }
 
@@ -226,7 +252,26 @@ export default memo(function TranscriptionDisplay({
             </div>
           </div>
         ))}
+        {isTranscribing && (
+          <div className="flex justify-center items-center mt-4">
+            <div className="animate-spin w-6 h-6 border-4 border-[#ff7eb3] border-t-transparent rounded-full"></div>
+            <span className="ml-2 text-gray-400">Transcribing...</span>
+          </div>
+        )}
       </div>
+      {isTranscribing && (
+        <div className="mt-4">
+          <div className="w-full bg-gray-700 rounded-full h-2">
+            <div
+              className="bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] h-2 rounded-full transition-all duration-200"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <div className="text-right text-gray-400 text-sm mt-1">
+            {progress.toFixed(1)}% completed
+          </div>
+        </div>
+      )}
     </div>
   );
 });
