@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { MetaFunction } from "@remix-run/node";
 import AudioUploader from "~/components/AudioUploader";
+import TranscriptionControl from "~/components/TranscriptionControl";
 import TranscriptionDisplay from "~/components/TranscriptionDisplay";
 import ConfigArea from "~/components/ConfigArea";
 import AudioPreview from "~/components/AudioPreview";
+import { TranscriptionSegment } from '../utils/transcription-formatter';
+import { processSSEStream } from '~/utils/sseUtils';
 
 export const meta: MetaFunction = () => {
   return [
@@ -15,38 +18,101 @@ export const meta: MetaFunction = () => {
 export default function Index() {
   const [transcription, setTranscription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isLiveMode, setIsLiveMode] = useState(false);
   const [language, setLanguage] = useState("english");
   const [numSpeakers, setNumSpeakers] = useState(2);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [segments, setSegments] = useState<TranscriptionSegment[]>([]);
+  const [isStoppingTranscription, setIsStoppingTranscription] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false); // Indicates transcription in progress
+  const [progress, setProgress] = useState(0); // New state for progress
 
   const handleTranscription = async (file: File) => {
     setSelectedFile(file);
     setIsLoading(true);
+    setIsTranscribing(true);
     setError(null);
-    
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("language", language);
-      formData.append("num_speakers", numSpeakers.toString());
+    setSegments([]);
+    setProgress(0);
 
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("language", language);
+    formData.append("num_speakers", numSpeakers.toString());
+
+    try {
       const response = await fetch("http://localhost:8000/transcribe", {
         method: "POST",
-        body: formData
+        body: formData,
       });
 
-      if (!response.ok) {
+      if (!response.ok || !response.body) {
         throw new Error("Failed to transcribe audio");
       }
 
-      const data = await response.json();
-      setTranscription(data.transcription);
+      await processSSEStream(response.body, (eventType, eventData) => {
+        switch (eventType) {
+          case "ready":
+            setIsLoading(false);
+            break;
+          case "transcription":
+            setSegments(prev => {
+              // If this is an update to the last segment, replace it
+              if (prev.length > 0 && prev[prev.length - 1].speaker === eventData.speaker) {
+                const newSegments = [...prev];
+                newSegments[newSegments.length - 1] = eventData;
+                return newSegments;
+              }
+              // Otherwise add as new segment
+              return [...prev, eventData];
+            });
+            break;
+          case "progress":
+            setProgress(eventData.progress);
+            break;
+          case "error":
+            setError(eventData.error);
+            setIsTranscribing(false);
+            break;
+          case "close":
+            setIsTranscribing(false);
+            setProgress(100);
+            break;
+        }
+      });
     } catch (error) {
       console.error("Error:", error);
       setError(error instanceof Error ? error.message : 'Failed to transcribe audio');
+      setIsTranscribing(false);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleStartLive = () => {
+    setIsLiveMode(true);
+    setError(null);
+    setSegments([]); // Clear previous segments
+  };
+
+  const handleStopLive = async () => {
+    try {
+      setIsStoppingTranscription(true);
+      const response = await fetch('http://localhost:8000/stop-live-transcribe', {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to stop transcription");
+      }
+      setIsLiveMode(false);
+    } catch (error) {
+      console.error("Error stopping transcription:", error);
+      setError(error instanceof Error ? error.message : 'Failed to stop transcription');
+    } finally {
+      setIsStoppingTranscription(false);
+      setIsTranscribing(false);
     }
   };
 
@@ -54,7 +120,30 @@ export default function Index() {
     setSelectedFile(null);
     setTranscription("");
     setError(null);
+    setSegments([]);
+    setIsTranscribing(false);
+    setProgress(0);
+    setIsLiveMode(false);
   };
+
+  const handleLanguageChange = useCallback((newLanguage: string) => {
+    setLanguage(newLanguage);
+  }, []);
+
+  const handleNumSpeakersChange = useCallback((num: number) => {
+    setNumSpeakers(num);
+  }, []);
+
+  const handleSegmentsUpdate = useCallback((segments: TranscriptionSegment[]) => {
+    setSegments(segments);
+  }, []);
+
+  // Clear segments when switching modes
+  useEffect(() => {
+    if (isLiveMode) {
+      setSegments([]);
+    }
+  }, [isLiveMode]);
 
   return (
     <div className="min-h-screen breathing-background relative">
@@ -69,25 +158,36 @@ export default function Index() {
         <div className="space-y-8">
           <ConfigArea
             language={language}
-            onLanguageChange={setLanguage}
+            onLanguageChange={handleLanguageChange}
             numSpeakers={numSpeakers}
-            onNumSpeakersChange={setNumSpeakers}
-            disabled={isLoading}
+            onNumSpeakersChange={handleNumSpeakersChange}
+            disabled={isLoading || isLiveMode}
           />
           
-          <div className="w-full max-w-2xl mx-auto">
+          <div className="w-full max-w-2xl mx-auto space-y-4">
             {selectedFile ? (
               <AudioPreview 
                 file={selectedFile} 
                 onClose={handleClearFile}
               />
             ) : (
-              <AudioUploader 
-                onFileSelect={handleTranscription} 
-                isUploading={isLoading}
-                language={language}
-                numSpeakers={numSpeakers}
-              />
+              <>
+                <AudioUploader 
+                  onFileSelect={handleTranscription}
+                  isUploading={isLoading}
+                  isDisabled={isLiveMode}
+                />
+                <div className="text-center">
+                  <span className="text-gray-400">or</span>
+                </div>
+                <TranscriptionControl
+                  isLiveMode={isLiveMode}
+                  isDisabled={isLoading}
+                  isStoppingTranscription={isStoppingTranscription}
+                  onStartLive={handleStartLive}
+                  onStopLive={handleStopLive}
+                />
+              </>
             )}
           </div>
           
@@ -97,12 +197,21 @@ export default function Index() {
             </div>
           )}
           
-          <TranscriptionDisplay 
-            transcription={transcription} 
+          <TranscriptionDisplay
+            isLiveMode={isLiveMode}
+            language={language}
+            numSpeakers={numSpeakers}
+            onSegmentsUpdate={handleSegmentsUpdate}
+            transcription={transcription}
             isLoading={isLoading}
+            segments={segments}
+            setSegments={setSegments}
+            isTranscribing={isTranscribing}
+            progress={progress}
+            setProgress={setProgress}
           />
         </div>
       </div>
     </div>
   );
-} 
+}

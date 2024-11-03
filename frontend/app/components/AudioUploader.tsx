@@ -4,13 +4,13 @@ import type { ChangeEvent } from 'react';
 interface AudioUploaderProps {
   onFileSelect: (file: File) => void;
   isUploading: boolean;
-  language: string;
-  numSpeakers: number;
+  isDisabled: boolean;
 }
 
 export default function AudioUploader({ 
   onFileSelect, 
-  isUploading 
+  isUploading,
+  isDisabled
 }: AudioUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
 
@@ -61,7 +61,7 @@ export default function AudioUploader({
         accept="audio/*"
         onChange={handleChange}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        disabled={isUploading}
+        disabled={isDisabled}
       />
       <div className="space-y-4">
         <div className="text-gray-300">
