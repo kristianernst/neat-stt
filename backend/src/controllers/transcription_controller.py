@@ -65,6 +65,7 @@ class TranscriptionController:
               break
 
             if result["type"] == "transcription":
+              self.logger.debug(f"Transcription result: {result['data']}")
               yield {"event": "transcription", "data": json.dumps(result["data"])}
             elif result["type"] == "progress":
               yield {"event": "progress", "data": json.dumps({"progress": result["progress"]})}

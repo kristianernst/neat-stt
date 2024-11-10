@@ -16,12 +16,13 @@ export async function processSSEStream(
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
-      for (const line of lines) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         if (line.trim() === '') continue;
-        
+
         if (line.startsWith('event: ')) {
           const eventType = line.slice(7).trim();
-          const dataLine = lines[lines.indexOf(line) + 1];
+          const dataLine = lines[i + 1]; // Access the next line directly
           if (dataLine?.startsWith('data: ')) {
             try {
               const data = JSON.parse(dataLine.slice(6));
@@ -40,6 +41,7 @@ export async function processSSEStream(
             } catch (e) {
               console.error('Failed to parse SSE data:', e);
             }
+            i++; // Skip the data line since it's already processed
           }
         }
       }
