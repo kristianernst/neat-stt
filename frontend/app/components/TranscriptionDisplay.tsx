@@ -33,6 +33,9 @@ export default memo(function TranscriptionDisplay({
   const [isInitializing, setIsInitializing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   // Smooth scroll to bottom when new segments are added
   useEffect(() => {
@@ -53,23 +56,34 @@ export default memo(function TranscriptionDisplay({
       return `${timestamp}\n${segment.speaker}: ${segment.text}`;
     }).join('\n');
     navigator.clipboard.writeText(text);
+    
+    // Show success state
+    setCopySuccess(true);
+    
+    // Reset after animation
+    setTimeout(() => {
+      setCopySuccess(false);
+    }, 2000);
   };
 
-  const handleDownload = () => {
-    const downloadFormat = window.confirm(
-      'Choose a format:\nOK - Markdown (.md)\nCancel - Plain Text (.txt)'
-    ) ? 'md' : 'txt';
-
-    const formattedContent = formatTranscription(segments, downloadFormat);
+  const handleDownload = (format: 'md' | 'txt') => {
+    const formattedContent = formatTranscription(segments, format);
     const blob = new Blob([formattedContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `transcription.${downloadFormat}`;
+    a.download = `transcription.${format}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    setIsDownloadModalOpen(false);
+    setDownloadSuccess(true);
+    
+    setTimeout(() => {
+      setDownloadSuccess(false);
+    }, 2000);
   };
 
   const formatTime = (seconds: number): string => {
@@ -220,17 +234,69 @@ export default memo(function TranscriptionDisplay({
       <div className="flex justify-end mb-2 space-x-4">
         <button
           onClick={handleCopy}
-          className="text-gray-400 hover:text-white focus:outline-none flex items-center space-x-1"
+          className="text-gray-400 hover:text-white focus:outline-none flex items-center space-x-1 group relative"
+          disabled={copySuccess}
         >
-          <FiCopy className="w-5 h-5" />
-          <span className="text-sm">Copy</span>
+          <div className="relative w-5 h-5">
+            <FiCopy 
+              className={`w-5 h-5 absolute transition-all duration-300 ${
+                copySuccess ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
+              }`}
+            />
+            <svg 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className={`w-5 h-5 absolute transition-all duration-300 ${
+                copySuccess 
+                  ? 'opacity-100 scale-100 text-green-400' 
+                  : 'opacity-0 scale-75'
+              }`}
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <span className={`text-sm transition-colors duration-300 ${
+            copySuccess ? 'text-green-400' : ''
+          }`}>
+            {copySuccess ? 'Copied!' : 'Copy'}
+          </span>
         </button>
         <button
-          onClick={handleDownload}
-          className="text-gray-400 hover:text-white focus:outline-none flex items-center space-x-1"
+          onClick={() => setIsDownloadModalOpen(true)}
+          className="text-gray-400 hover:text-white focus:outline-none flex items-center space-x-1 group relative"
+          disabled={downloadSuccess}
         >
-          <FiDownload className="w-5 h-5" />
-          <span className="text-sm">Download</span>
+          <div className="relative w-5 h-5">
+            <FiDownload 
+              className={`w-5 h-5 absolute transition-all duration-300 ${
+                downloadSuccess ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
+              }`}
+            />
+            <svg 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className={`w-5 h-5 absolute transition-all duration-300 ${
+                downloadSuccess 
+                  ? 'opacity-100 scale-100 text-green-400' 
+                  : 'opacity-0 scale-75'
+              }`}
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <span className={`text-sm transition-colors duration-300 ${
+            downloadSuccess ? 'text-green-400' : ''
+          }`}>
+            {downloadSuccess ? 'Downloaded!' : 'Download'}
+          </span>
         </button>
       </div>
       <div ref={scrollRef} className="card p-6 space-y-4 max-h-[600px] overflow-y-auto">
@@ -269,6 +335,55 @@ export default memo(function TranscriptionDisplay({
           </div>
           <div className="text-right text-gray-400 text-sm mt-1">
             {progress.toFixed(1)}% completed
+          </div>
+        </div>
+      )}
+      {/* Format Selection Modal */}
+      {isDownloadModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsDownloadModalOpen(false)}
+          />
+          <div className="relative bg-gray-900 rounded-xl p-6 shadow-xl border border-gray-800 w-full max-w-sm">
+            <h3 className="text-lg font-medium text-gray-200 mb-4">
+              Choose Format
+            </h3>
+            <div className="space-y-2">
+              <button
+                onClick={() => handleDownload('md')}
+                className="w-full p-4 rounded-lg bg-gradient-to-r from-[#ff7eb3]/10 to-[#8957ff]/10 
+                         border border-gray-800 hover:border-[#ff7eb3]/50 transition-all duration-300
+                         text-left group"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] group-hover:shadow-lg group-hover:shadow-purple-500/20">
+                    <span className="text-white text-lg">.md</span>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-200">Markdown</div>
+                    <div className="text-sm text-gray-400">Formatted with headers and styling</div>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => handleDownload('txt')}
+                className="w-full p-4 rounded-lg bg-gradient-to-r from-[#ff7eb3]/10 to-[#8957ff]/10 
+                         border border-gray-800 hover:border-[#ff7eb3]/50 transition-all duration-300
+                         text-left group"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] group-hover:shadow-lg group-hover:shadow-purple-500/20">
+                    <span className="text-white text-lg">.txt</span>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-200">Plain Text</div>
+                    <div className="text-sm text-gray-400">Simple text format</div>
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       )}
