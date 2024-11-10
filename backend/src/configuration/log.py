@@ -50,7 +50,7 @@ def get_logger(name: Optional[str] = None, level: Optional[Union[str, int]] = LO
     name = APPLICATION_NAME
 
   logger = logging.getLogger(name)
-  
+
   if level is not None:
     logger.setLevel(level)
 

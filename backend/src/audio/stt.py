@@ -12,8 +12,7 @@ from src.audio.preprocess import load_audio_segment, read_audio
 from src.audio.recorder import AudioRecorder
 from src.audio.transcription import TranscriptionProcessor
 from src.audio.utils import merge_segments
-from src.configuration.environment import (MAX_CHUNK_LENGTH_MS,
-                                           MIN_CHUNK_LENGTH_MS, MODEL_ID)
+from src.configuration.environment import MAX_CHUNK_LENGTH_MS, MIN_CHUNK_LENGTH_MS, MODEL_ID
 from src.configuration.log import get_logger
 
 
@@ -44,7 +43,7 @@ class SpeechToText:
       self.model = model
     else:
       raise ValueError("Model is required, please specify a model")
-    
+
     if self.device not in ["cuda", "mps", "cpu"]:
       self.logger.warning(f"Invalid device: {self.device}, defaulting to CPU")
       self.device = "cpu"
@@ -88,7 +87,7 @@ class SpeechToText:
     # Constants for chunk size control
     max_chunk_length = int(MAX_CHUNK_LENGTH_MS)
     min_chunk_length = int(MIN_CHUNK_LENGTH_MS)
-    
+
     try:
       # Read audio for both transcription and diarization
       waveform, sample_rate = read_audio(input_file, self.device)

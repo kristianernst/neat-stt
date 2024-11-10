@@ -32,8 +32,8 @@ class TranscriptionController:
     """
     try:
       if not file.filename:
-          raise HTTPException(status_code=400, detail="Filename is required")
-          
+        raise HTTPException(status_code=400, detail="Filename is required")
+
       self.stt._update_settings(language, num_speakers)
       with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
         content = await file.read()

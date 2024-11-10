@@ -32,7 +32,7 @@ class AudioRecorder:
     # List all audio devices
     info = self.audio.get_host_api_info_by_index(0)
     num_devices = info.get("deviceCount")
-    
+
     if isinstance(num_devices, int):
       for i in range(num_devices):
         device_info = self.audio.get_device_info_by_index(i)

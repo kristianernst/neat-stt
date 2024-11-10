@@ -6,6 +6,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore
 
 from src.configuration.log import get_logger
 
+
 class TranscriptionCorrector:
   def __init__(self, model_name: str = "gpt2", device: str = "cpu"):
     self.logger = get_logger()

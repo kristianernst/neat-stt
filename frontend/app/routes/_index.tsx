@@ -3,7 +3,6 @@ import type { MetaFunction } from "@remix-run/node";
 import AudioUploader from "~/components/AudioUploader";
 import TranscriptionControl from "~/components/TranscriptionControl";
 import TranscriptionDisplay from "~/components/TranscriptionDisplay";
-import ConfigArea from "~/components/ConfigArea";
 import AudioPreview from "~/components/AudioPreview";
 import { TranscriptionSegment } from '../utils/transcription-formatter';
 import { processSSEStream } from '~/utils/sseUtils';
