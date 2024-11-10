@@ -20,7 +20,7 @@ export default memo(function TranscriptionControl({
       return {
         onClick: () => {},
         text: 'Stopping Transcription...',
-        className: 'bg-red-500/20 text-red-300',
+        className: 'bg-[var(--error-bg)] text-[var(--error-text)]',
         disabled: true,
       };
     }
@@ -28,13 +28,13 @@ export default memo(function TranscriptionControl({
       return {
         onClick: onStopLive,
         text: 'Stop Transcription',
-        className: 'bg-red-500/20 text-red-300 hover:bg-red-500/30',
+        className: 'bg-[var(--error-bg)] text-[var(--error-text)] hover:bg-[var(--error-bg)]/80',
       };
     }
     return {
       onClick: onStartLive,
       text: 'Start Live Transcription',
-      className: 'bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] hover:shadow-lg hover:shadow-purple-500/20',
+      className: 'gradient-button',
     };
   };
 

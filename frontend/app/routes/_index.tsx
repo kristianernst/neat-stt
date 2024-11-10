@@ -7,6 +7,12 @@ import ConfigArea from "~/components/ConfigArea";
 import AudioPreview from "~/components/AudioPreview";
 import { TranscriptionSegment } from '../utils/transcription-formatter';
 import { processSSEStream } from '~/utils/sseUtils';
+import Header from "~/components/Header";
+import Settings from "~/components/Settings";
+import { useOutletContext } from "@remix-run/react";
+import ConfigurationSummary from "~/components/ConfigurationSummary";
+
+type ContextType = { isDark: boolean; setIsDark: (isDark: boolean) => void };
 
 export const meta: MetaFunction = () => {
   return [
@@ -14,7 +20,6 @@ export const meta: MetaFunction = () => {
     { name: "description", content: "Transcribe your audio files with speaker diarization" },
   ];
 };
-
 export default function Index() {
   const [transcription, setTranscription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +32,8 @@ export default function Index() {
   const [isStoppingTranscription, setIsStoppingTranscription] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false); // Indicates transcription in progress
   const [progress, setProgress] = useState(0); // New state for progress
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const { isDark, setIsDark } = useOutletContext<ContextType>();
 
   const handleTranscription = async (file: File) => {
     setSelectedFile(file);
@@ -116,7 +123,7 @@ export default function Index() {
     }
   };
 
-  const handleClearFile = () => {
+  const handleClearFile = useCallback(() => {
     setSelectedFile(null);
     setTranscription("");
     setError(null);
@@ -124,7 +131,7 @@ export default function Index() {
     setIsTranscribing(false);
     setProgress(0);
     setIsLiveMode(false);
-  };
+  }, []);
 
   const handleLanguageChange = useCallback((newLanguage: string) => {
     setLanguage(newLanguage);
@@ -137,7 +144,6 @@ export default function Index() {
   const handleSegmentsUpdate = useCallback((segments: TranscriptionSegment[]) => {
     setSegments(segments);
   }, []);
-
   // Clear segments when switching modes
   useEffect(() => {
     if (isLiveMode) {
@@ -147,20 +153,13 @@ export default function Index() {
 
   return (
     <div className="min-h-screen breathing-background relative">
-      <div className="container mx-auto px-4 py-12 max-w-5xl relative z-10">
-        <h1 className="text-4xl font-bold text-center mb-2 gradient-text">
-          Audio Transcription
-        </h1>
-        <p className="text-center text-gray-400 mb-12">
-          Transform your audio into text with speaker detection
-        </p>
-        
+      <Header isDark={isDark} onThemeChange={setIsDark} />
+      <div className="container mx-auto px-4 pt-32 pb-12 max-w-5xl relative z-10">
         <div className="space-y-8">
-          <ConfigArea
+          <ConfigurationSummary
             language={language}
-            onLanguageChange={handleLanguageChange}
             numSpeakers={numSpeakers}
-            onNumSpeakersChange={handleNumSpeakersChange}
+            onOpenSettings={() => setIsSettingsOpen(true)}
             disabled={isLoading || isLiveMode}
           />
           
@@ -212,6 +211,15 @@ export default function Index() {
           />
         </div>
       </div>
+      <Settings
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        language={language}
+        onLanguageChange={handleLanguageChange}
+        numSpeakers={numSpeakers}
+        onNumSpeakersChange={handleNumSpeakersChange}
+        disabled={isLoading || isLiveMode}
+      />
     </div>
   );
 }

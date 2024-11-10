@@ -190,12 +190,27 @@ export default memo(function TranscriptionDisplay({
     }).filter(Boolean) as TranscriptionSegment[];
   };
 
+  useEffect(() => {
+    if (scrollRef.current && segments.length > 0) {
+      // Slightly scroll down to hint at scrollability
+      scrollRef.current.scrollTop = 10;
+      
+      // Then smoothly scroll back to top
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      }, 500);
+    }
+  }, [segments.length === 1]); // Only trigger on first segment
+
   if (isInitializing && isLiveMode) {
     return (
       <div className="mt-4 card p-6 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-[#ff7eb3] border-t-transparent rounded-full mx-auto mb-4"></div>
-        <p className="text-gray-400">Initializing transcription...</p>
-        <p className="text-sm text-gray-500 mt-2">Please wait while we set up the transcription service</p>
+        <div className="animate-spin w-8 h-8 border-4 border-[var(--spinner-border)] border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-[var(--text-gray-400)]">Initializing transcription...</p>
+        <p className="text-sm text-[var(--text-gray-500)] mt-2">Please wait while we set up the transcription service</p>
       </div>
     );
   }
@@ -205,17 +220,17 @@ export default memo(function TranscriptionDisplay({
     // Show a loading indicator when transcribing
     return (
       <div className="mt-4 card p-6 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-[#ff7eb3] border-t-transparent rounded-full mx-auto mb-4"></div>
-        <p className="text-gray-400">Transcribing...</p>
+        <div className="animate-spin w-8 h-8 border-4 border-[var(--gradient-start)] border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-[var(--text-secondary)]">Transcribing...</p>
         {isTranscribing && (
           <div className="mt-4">
-            <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full h-2">
               <div
-                className="bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] h-2 rounded-full transition-all duration-200"
+                className="bg-[var(--gradient-start)] h-2 rounded-full transition-all duration-200"
                 style={{ width: `${progress}%` }}
               ></div>
             </div>
-            <div className="text-right text-gray-400 text-sm mt-1">
+            <div className="text-right text-[var(--text-secondary)] text-sm mt-1">
               {progress.toFixed(1)}% completed
             </div>
           </div>
@@ -234,7 +249,8 @@ export default memo(function TranscriptionDisplay({
       <div className="flex justify-end mb-2 space-x-4">
         <button
           onClick={handleCopy}
-          className="text-gray-400 hover:text-white focus:outline-none flex items-center space-x-1 group relative"
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] 
+                     focus:outline-none flex items-center space-x-1 group relative"
           disabled={copySuccess}
         >
           <div className="relative w-5 h-5">
@@ -252,7 +268,7 @@ export default memo(function TranscriptionDisplay({
               strokeLinejoin="round"
               className={`w-5 h-5 absolute transition-all duration-300 ${
                 copySuccess 
-                  ? 'opacity-100 scale-100 text-green-400' 
+                  ? 'opacity-100 scale-100 text-[var(--success-text)]' 
                   : 'opacity-0 scale-75'
               }`}
             >
@@ -260,14 +276,15 @@ export default memo(function TranscriptionDisplay({
             </svg>
           </div>
           <span className={`text-sm transition-colors duration-300 ${
-            copySuccess ? 'text-green-400' : ''
+            copySuccess ? 'text-[var(--success-text)]' : ''
           }`}>
             {copySuccess ? 'Copied!' : 'Copy'}
           </span>
         </button>
         <button
           onClick={() => setIsDownloadModalOpen(true)}
-          className="text-gray-400 hover:text-white focus:outline-none flex items-center space-x-1 group relative"
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] 
+                     focus:outline-none flex items-center space-x-1 group relative"
           disabled={downloadSuccess}
         >
           <div className="relative w-5 h-5">
@@ -285,7 +302,7 @@ export default memo(function TranscriptionDisplay({
               strokeLinejoin="round"
               className={`w-5 h-5 absolute transition-all duration-300 ${
                 downloadSuccess 
-                  ? 'opacity-100 scale-100 text-green-400' 
+                  ? 'opacity-100 scale-100 text-[var(--success-text)]' 
                   : 'opacity-0 scale-75'
               }`}
             >
@@ -293,47 +310,50 @@ export default memo(function TranscriptionDisplay({
             </svg>
           </div>
           <span className={`text-sm transition-colors duration-300 ${
-            downloadSuccess ? 'text-green-400' : ''
+            downloadSuccess ? 'text-[var(--success-text)]' : ''
           }`}>
             {downloadSuccess ? 'Downloaded!' : 'Download'}
           </span>
         </button>
       </div>
-      <div ref={scrollRef} className="card p-6 space-y-4 max-h-[600px] overflow-y-auto">
+      <div ref={scrollRef} className="card p-6 space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar relative">
+        {/* Top gradient fade */}
+        <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-[var(--card-bg)] to-transparent pointer-events-none z-10" />
+        
+        {/* Content */}
         {segments.map((segment, index) => (
           <div
             key={`${index}`}
-            className="space-y-2 hover:bg-gray-800/30 p-3 rounded-lg transition-all duration-200"
+            className="space-y-2 hover:bg-[var(--card-hover)] p-3 rounded-lg transition-all duration-200"
           >
             <div className="text-sm gradient-text font-mono">
               {segment.start !== undefined && segment.end !== undefined
                 ? `[${formatTime(segment.start)} -> ${formatTime(segment.end)}]`
                 : segment.timestamp || null}
             </div>
-            <div className="text-gray-300 leading-relaxed font-serif">
+            <div className="text-[var(--text-primary)] leading-relaxed font-serif">
               {segment.speaker ? (
-                <span className="font-medium text-[#ff7eb3]">{segment.speaker}:</span>
+                <span className="font-medium text-[var(--gradient-start)]">
+                  {segment.speaker}:
+                </span>
               ) : null}{' '}
               {segment.text}
             </div>
           </div>
         ))}
-        {isTranscribing && (
-          <div className="flex justify-center items-center mt-4">
-            <div className="animate-spin w-6 h-6 border-4 border-[#ff7eb3] border-t-transparent rounded-full"></div>
-            <span className="ml-2 text-gray-400">Transcribing...</span>
-          </div>
-        )}
+        
+        {/* Bottom gradient fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[var(--card-bg)] to-transparent pointer-events-none z-10" />
       </div>
       {isTranscribing && (
         <div className="mt-4">
-          <div className="w-full bg-gray-700 rounded-full h-2">
+          <div className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full h-2">
             <div
-              className="bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] h-2 rounded-full transition-all duration-200"
+              className="bg-[var(--gradient-start)] h-2 rounded-full transition-all duration-200"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
-          <div className="text-right text-gray-400 text-sm mt-1">
+          <div className="text-right text-[var(--text-secondary)] text-sm mt-1">
             {progress.toFixed(1)}% completed
           </div>
         </div>
@@ -342,44 +362,31 @@ export default memo(function TranscriptionDisplay({
       {isDownloadModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--modal-overlay)] backdrop-blur-sm"
             onClick={() => setIsDownloadModalOpen(false)}
           />
-          <div className="relative bg-gray-900 rounded-xl p-6 shadow-xl border border-gray-800 w-full max-w-sm">
-            <h3 className="text-lg font-medium text-gray-200 mb-4">
+          <div className="relative bg-[var(--modal-bg)] card p-6 w-full max-w-sm">
+            <h3 className="text-lg font-medium text-[var(--text-primary)] mb-4">
               Choose Format
             </h3>
             <div className="space-y-2">
               <button
                 onClick={() => handleDownload('md')}
-                className="w-full p-4 rounded-lg bg-gradient-to-r from-[#ff7eb3]/10 to-[#8957ff]/10 
-                         border border-gray-800 hover:border-[#ff7eb3]/50 transition-all duration-300
+                className="w-full p-4 rounded-lg bg-[var(--card-bg)]
+                         border border-[var(--card-border)] 
+                         hover:border-[var(--gradient-start)]/50 
+                         transition-all duration-300
                          text-left group"
               >
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] group-hover:shadow-lg group-hover:shadow-purple-500/20">
+                  <div className="p-2 rounded-lg gradient-button">
                     <span className="text-white text-lg">.md</span>
                   </div>
                   <div>
-                    <div className="font-medium text-gray-200">Markdown</div>
-                    <div className="text-sm text-gray-400">Formatted with headers and styling</div>
-                  </div>
-                </div>
-              </button>
-              
-              <button
-                onClick={() => handleDownload('txt')}
-                className="w-full p-4 rounded-lg bg-gradient-to-r from-[#ff7eb3]/10 to-[#8957ff]/10 
-                         border border-gray-800 hover:border-[#ff7eb3]/50 transition-all duration-300
-                         text-left group"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] group-hover:shadow-lg group-hover:shadow-purple-500/20">
-                    <span className="text-white text-lg">.txt</span>
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-200">Plain Text</div>
-                    <div className="text-sm text-gray-400">Simple text format</div>
+                    <div className="font-medium text-[var(--text-primary)]">Markdown</div>
+                    <div className="text-sm text-[var(--text-secondary)]">
+                      Formatted with headers and styling
+                    </div>
                   </div>
                 </div>
               </button>

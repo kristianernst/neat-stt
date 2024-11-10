@@ -123,20 +123,19 @@ export default function SpeakerCounter({ value, onChange, disabled }: SpeakerCou
   
   return (
     <div className="space-y-6">
-      <label className="block text-sm font-medium text-gray-200">
-        Number of Speakers: {value}
-      </label>
       <div className="w-full h-64 relative">
         <SpeakerIllustration count={value} />
         <div className="absolute -bottom-4 left-0 right-0 pb-2">
           <div className="relative flex items-center mb-6">
             {/* Background track */}
-            <div className="absolute inset-0 h-2 rounded-lg bg-gray-800/50"></div>
+            <div className="absolute inset-0 h-[var(--slider-track-height)] rounded-full bg-[var(--slider-bg)] shadow-inner"></div>
+            
             {/* Gradient fill */}
             <div 
-              className="absolute h-2 rounded-lg bg-gradient-to-r from-[#ff7eb3] via-[#e056fd] to-[#8957ff]"
+              className="absolute h-[var(--slider-track-height)] rounded-full gradient-button shadow-sm"
               style={{ width: `${percentage}%` }}
             ></div>
+            
             {/* Slider input */}
             <input
               type="range"
@@ -146,19 +145,51 @@ export default function SpeakerCounter({ value, onChange, disabled }: SpeakerCou
               onChange={(e) => onChange(parseInt(e.target.value))}
               disabled={disabled}
               className="
-                relative z-10 w-full h-2
-                appearance-none bg-transparent
+                relative z-10 w-full h-[var(--slider-track-height)]
+                appearance-none bg-transparent cursor-pointer
+
                 [&::-webkit-slider-thumb]:appearance-none
-                [&::-webkit-slider-thumb]:h-5
-                [&::-webkit-slider-thumb]:w-5
+                [&::-webkit-slider-thumb]:h-[var(--slider-thumb-size)]
+                [&::-webkit-slider-thumb]:w-[var(--slider-thumb-size)]
                 [&::-webkit-slider-thumb]:rounded-full
-                [&::-webkit-slider-thumb]:bg-gradient-to-r
-                [&::-webkit-slider-thumb]:from-[#ff7eb3]
-                [&::-webkit-slider-thumb]:to-[#8957ff]
-                [&::-webkit-slider-thumb]:shadow-md
-                [&::-webkit-slider-thumb]:border-2
-                [&::-webkit-slider-thumb]:border-white/30
+                [&::-webkit-slider-thumb]:bg-white
+                [&::-webkit-slider-thumb]:gradient-button
+                [&::-webkit-slider-thumb]:shadow-xl
+                [&::-webkit-slider-thumb]:shadow-[var(--slider-thumb-shadow)]
+                [&::-webkit-slider-thumb]:border-[var(--slider-thumb-border)]
+                [&::-webkit-slider-thumb]:border-white
                 [&::-webkit-slider-thumb]:cursor-pointer
+                [&::-webkit-slider-thumb]:ring-2
+                [&::-webkit-slider-thumb]:ring-white/50
+                [&::-webkit-slider-thumb]:ring-offset-2
+                [&::-webkit-slider-thumb]:ring-offset-[var(--gradient-start)]
+                [&::-webkit-slider-thumb]:hover:scale-110
+                [&::-webkit-slider-thumb]:hover:shadow-2xl
+                [&::-webkit-slider-thumb]:hover:shadow-[var(--slider-thumb-hover-shadow)]
+                [&::-webkit-slider-thumb]:hover:ring-white
+                [&::-webkit-slider-thumb]:transition-all
+                [&::-webkit-slider-thumb]:duration-200
+                
+                [&::-moz-range-thumb]:h-[var(--slider-thumb-size)]
+                [&::-moz-range-thumb]:w-[var(--slider-thumb-size)]
+                [&::-moz-range-thumb]:rounded-full
+                [&::-moz-range-thumb]:bg-white
+                [&::-moz-range-thumb]:gradient-button
+                [&::-moz-range-thumb]:shadow-xl
+                [&::-moz-range-thumb]:shadow-[var(--slider-thumb-shadow)]
+                [&::-moz-range-thumb]:border-[var(--slider-thumb-border)]
+                [&::-moz-range-thumb]:border-white
+                [&::-moz-range-thumb]:cursor-pointer
+                [&::-moz-range-thumb]:ring-2
+                [&::-moz-range-thumb]:ring-white/50
+                [&::-moz-range-thumb]:ring-offset-2
+                [&::-moz-range-thumb]:ring-offset-[var(--gradient-start)]
+                [&::-moz-range-thumb]:hover:scale-110
+                [&::-moz-range-thumb]:hover:shadow-2xl
+                [&::-moz-range-thumb]:hover:shadow-[var(--slider-thumb-hover-shadow)]
+                [&::-moz-range-thumb]:hover:ring-white
+                [&::-moz-range-thumb]:transition-all
+                [&::-moz-range-thumb]:duration-200
               "
             />
           </div>
@@ -167,7 +198,11 @@ export default function SpeakerCounter({ value, onChange, disabled }: SpeakerCou
             {[...Array(10)].map((_, i) => (
               <span 
                 key={i}
-                className={`text-xs ${value === i + 1 ? 'text-gray-200' : 'text-gray-400'}`}
+                className={`text-xs ${
+                  value === i + 1 
+                    ? 'text-[var(--text-primary)]' 
+                    : 'text-[var(--text-secondary)]'
+                }`}
               >
                 {i + 1}
               </span>
