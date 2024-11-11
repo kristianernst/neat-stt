@@ -8,6 +8,5 @@
 
 
 ### UI
-- [ ] Make smaller button animations for copy to clipboard and download
-- [ ] better rendering
-- [ ] mail service, to send when jobs done
+- [x] Make smaller button animations for copy to clipboard and download
+- [x] better rendering
