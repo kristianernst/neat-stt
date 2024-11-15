@@ -16,30 +16,38 @@ export async function processSSEStream(
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
-      for (const line of lines) {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         if (line.trim() === '') continue;
-        
+
         if (line.startsWith('event: ')) {
           const eventType = line.slice(7).trim();
-          const dataLine = lines[lines.indexOf(line) + 1];
+          const dataLine = lines[i + 1]; // Access the next line directly
           if (dataLine?.startsWith('data: ')) {
             try {
               const data = JSON.parse(dataLine.slice(6));
               
               // Handle segment concatenation for transcription events
-              if (eventType === 'transcription' && lastSegment && lastSegment.speaker === data.speaker) {
-                // Concatenate with previous segment
-                lastSegment.text = `${lastSegment.text} ${data.text}`.trim();
-                lastSegment.end = data.end;
-                onEvent(eventType, lastSegment);
+              if (eventType === 'transcription') {
+                if (lastSegment && lastSegment.speaker === data.speaker && 
+                    Math.abs(lastSegment.end - data.start) < 0.5) { // Add time threshold check
+                  // Concatenate with previous segment only if they're close in time
+                  lastSegment.text = `${lastSegment.text} ${data.text}`.trim();
+                  lastSegment.end = data.end;
+                  onEvent(eventType, lastSegment);
+                } else {
+                  // New speaker or time gap too large
+                  lastSegment = { ...data };
+                  onEvent(eventType, data);
+                }
               } else {
-                // New speaker or different event type
-                lastSegment = eventType === 'transcription' ? { ...data } : null;
+                lastSegment = null;
                 onEvent(eventType, data);
               }
             } catch (e) {
               console.error('Failed to parse SSE data:', e);
             }
+            i++; // Skip the data line since it's already processed
           }
         }
       }

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import type { TranscriptionSegment } from '../utils/transcription-formatter';
 import { formatTranscription } from '../utils/transcription-formatter';
 import { FiCopy, FiDownload } from 'react-icons/fi';
+import debounce from 'lodash/debounce';
 
 interface TranscriptionDisplayProps {
   isLiveMode: boolean;
@@ -33,6 +34,9 @@ export default memo(function TranscriptionDisplay({
   const [isInitializing, setIsInitializing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   // Smooth scroll to bottom when new segments are added
   useEffect(() => {
@@ -53,23 +57,40 @@ export default memo(function TranscriptionDisplay({
       return `${timestamp}\n${segment.speaker}: ${segment.text}`;
     }).join('\n');
     navigator.clipboard.writeText(text);
+    
+    // Show success state
+    setCopySuccess(true);
+    
+    // Reset after animation
+    setTimeout(() => {
+      setCopySuccess(false);
+    }, 2000);
   };
 
-  const handleDownload = () => {
-    const downloadFormat = window.confirm(
-      'Choose a format:\nOK - Markdown (.md)\nCancel - Plain Text (.txt)'
-    ) ? 'md' : 'txt';
-
-    const formattedContent = formatTranscription(segments, downloadFormat);
+  const handleDownload = (format: 'md' | 'txt') => {
+    // Create a deep copy of segments to prevent any state issues
+    const segmentsCopy = JSON.parse(JSON.stringify(segments));
+    
+    // Sort segments by start time to ensure correct order
+    segmentsCopy.sort((a: TranscriptionSegment, b: TranscriptionSegment) => (a.start || 0) - (b.start || 0));
+    
+    const formattedContent = formatTranscription(segmentsCopy, format);
     const blob = new Blob([formattedContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `transcription.${downloadFormat}`;
+    a.download = `transcription.${format}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    setIsDownloadModalOpen(false);
+    setDownloadSuccess(true);
+    
+    setTimeout(() => {
+      setDownloadSuccess(false);
+    }, 2000);
   };
 
   const formatTime = (seconds: number): string => {
@@ -81,22 +102,25 @@ export default memo(function TranscriptionDisplay({
     if (!data) return;
 
     setSegments(prev => {
-      // Check if this is a new speaker or continuation
-      if (prev.length > 0 && prev[prev.length - 1].speaker === data.speaker) {
-        const newSegments = [...prev];
-        const lastSegment = { ...newSegments[newSegments.length - 1] };
-        lastSegment.text = `${lastSegment.text} ${data.text}`.trim();
-        lastSegment.end = data.end;
-        newSegments[newSegments.length - 1] = lastSegment;
-        onSegmentsUpdate?.(newSegments);
-        return newSegments;
+      const newSegments = [...prev];
+      const existingIndex = newSegments.findIndex(seg => 
+        seg.start === data.start && 
+        seg.speaker === data.speaker
+      );
+
+      if (existingIndex !== -1) {
+        newSegments[existingIndex] = {
+          ...newSegments[existingIndex],
+          text: data.text,
+          end: data.end
+        };
+      } else {
+        newSegments.push({ ...data });
       }
       
-      const newSegments = [...prev, data];
-      onSegmentsUpdate?.(newSegments);
       return newSegments;
     });
-  }, [onSegmentsUpdate]);
+  }, []);
 
   const handleProgressEvent = useCallback((event: MessageEvent) => {
     const data = event.data ? JSON.parse(event.data) : {};
@@ -176,12 +200,40 @@ export default memo(function TranscriptionDisplay({
     }).filter(Boolean) as TranscriptionSegment[];
   };
 
+  useEffect(() => {
+    if (scrollRef.current && segments.length > 0) {
+      // Slightly scroll down to hint at scrollability
+      scrollRef.current.scrollTop = 10;
+      
+      // Then smoothly scroll back to top
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      }, 500);
+    }
+  }, [segments.length === 1]); // Only trigger on first segment
+
+  const debouncedSetSegments = useCallback(
+    debounce((newSegments: TranscriptionSegment[]) => {
+      setSegments(newSegments);
+    }, 100),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      setSegments([]);
+    };
+  }, []);
+
   if (isInitializing && isLiveMode) {
     return (
       <div className="mt-4 card p-6 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-[#ff7eb3] border-t-transparent rounded-full mx-auto mb-4"></div>
-        <p className="text-gray-400">Initializing transcription...</p>
-        <p className="text-sm text-gray-500 mt-2">Please wait while we set up the transcription service</p>
+        <div className="animate-spin w-8 h-8 border-4 border-[var(--spinner-border)] border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-[var(--text-gray-400)]">Initializing transcription...</p>
+        <p className="text-sm text-[var(--text-gray-500)] mt-2">Please wait while we set up the transcription service</p>
       </div>
     );
   }
@@ -191,17 +243,17 @@ export default memo(function TranscriptionDisplay({
     // Show a loading indicator when transcribing
     return (
       <div className="mt-4 card p-6 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-[#ff7eb3] border-t-transparent rounded-full mx-auto mb-4"></div>
-        <p className="text-gray-400">Transcribing...</p>
+        <div className="animate-spin w-8 h-8 border-4 border-[var(--gradient-start)] border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-[var(--text-secondary)]">Transcribing...</p>
         {isTranscribing && (
           <div className="mt-4">
-            <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full h-2">
               <div
-                className="bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] h-2 rounded-full transition-all duration-200"
+                className="bg-[var(--gradient-start)] h-2 rounded-full transition-all duration-200"
                 style={{ width: `${progress}%` }}
               ></div>
             </div>
-            <div className="text-right text-gray-400 text-sm mt-1">
+            <div className="text-right text-[var(--text-secondary)] text-sm mt-1">
               {progress.toFixed(1)}% completed
             </div>
           </div>
@@ -220,55 +272,156 @@ export default memo(function TranscriptionDisplay({
       <div className="flex justify-end mb-2 space-x-4">
         <button
           onClick={handleCopy}
-          className="text-gray-400 hover:text-white focus:outline-none flex items-center space-x-1"
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] 
+                     focus:outline-none flex items-center space-x-1 group relative"
+          disabled={copySuccess}
         >
-          <FiCopy className="w-5 h-5" />
-          <span className="text-sm">Copy</span>
+          <div className="relative w-5 h-5">
+            <FiCopy 
+              className={`w-5 h-5 absolute transition-all duration-300 ${
+                copySuccess ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
+              }`}
+            />
+            <svg 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className={`w-5 h-5 absolute transition-all duration-300 ${
+                copySuccess 
+                  ? 'opacity-100 scale-100 text-[var(--success-text)]' 
+                  : 'opacity-0 scale-75'
+              }`}
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <span className={`text-sm transition-colors duration-300 ${
+            copySuccess ? 'text-[var(--success-text)]' : ''
+          }`}>
+            {copySuccess ? 'Copied!' : 'Copy'}
+          </span>
         </button>
         <button
-          onClick={handleDownload}
-          className="text-gray-400 hover:text-white focus:outline-none flex items-center space-x-1"
+          onClick={() => setIsDownloadModalOpen(true)}
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] 
+                     focus:outline-none flex items-center space-x-1 group relative"
+          disabled={downloadSuccess}
         >
-          <FiDownload className="w-5 h-5" />
-          <span className="text-sm">Download</span>
+          <div className="relative w-5 h-5">
+            <FiDownload 
+              className={`w-5 h-5 absolute transition-all duration-300 ${
+                downloadSuccess ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
+              }`}
+            />
+            <svg 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className={`w-5 h-5 absolute transition-all duration-300 ${
+                downloadSuccess 
+                  ? 'opacity-100 scale-100 text-[var(--success-text)]' 
+                  : 'opacity-0 scale-75'
+              }`}
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <span className={`text-sm transition-colors duration-300 ${
+            downloadSuccess ? 'text-[var(--success-text)]' : ''
+          }`}>
+            {downloadSuccess ? 'Downloaded!' : 'Download'}
+          </span>
         </button>
       </div>
-      <div ref={scrollRef} className="card p-6 space-y-4 max-h-[600px] overflow-y-auto">
+      <div ref={scrollRef} className="card p-6 space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar relative">
+        {/* Top gradient fade */}
+        <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-[var(--card-bg)] to-transparent pointer-events-none z-10" />
+        
+        {/* Content */}
         {segments.map((segment, index) => (
           <div
-            key={`${index}`}
-            className="space-y-2 hover:bg-gray-800/30 p-3 rounded-lg transition-all duration-200"
+            key={`${segment.speaker}-${segment.start}-${segment.end}`}
+            className="space-y-2 p-3 rounded-lg"
           >
-            <div className="text-sm gradient-text font-mono">
-              {segment.start !== undefined && segment.end !== undefined
-                ? `[${formatTime(segment.start)} -> ${formatTime(segment.end)}]`
-                : segment.timestamp || null}
+            {/* Metadata line (timestamp + speaker) */}
+            <div className="flex items-center gap-2 text-sm">
+              <span className="gradient-text font-mono">
+                {segment.start !== undefined && segment.end !== undefined
+                  ? `[${formatTime(segment.start)} -> ${formatTime(segment.end)}]`
+                  : segment.timestamp || null}
+              </span>
+              {segment.speaker && (
+                <>
+                  <span className="text-[var(--text-secondary)]">•</span>
+                  <span className="font-medium text-[var(--gradient-start)]">
+                    {segment.speaker}
+                  </span>
+                </>
+              )}
             </div>
-            <div className="text-gray-300 leading-relaxed font-serif">
-              {segment.speaker ? (
-                <span className="font-medium text-[#ff7eb3]">{segment.speaker}:</span>
-              ) : null}{' '}
+
+            {/* Text content on new line */}
+            <div className="text-[var(--text-primary)] leading-relaxed font-serif pl-4">
               {segment.text}
             </div>
           </div>
         ))}
-        {isTranscribing && (
-          <div className="flex justify-center items-center mt-4">
-            <div className="animate-spin w-6 h-6 border-4 border-[#ff7eb3] border-t-transparent rounded-full"></div>
-            <span className="ml-2 text-gray-400">Transcribing...</span>
-          </div>
-        )}
+        
+        {/* Bottom gradient fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[var(--card-bg)] to-transparent pointer-events-none z-10" />
       </div>
       {isTranscribing && (
         <div className="mt-4">
-          <div className="w-full bg-gray-700 rounded-full h-2">
+          <div className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full h-2">
             <div
-              className="bg-gradient-to-r from-[#ff7eb3] to-[#8957ff] h-2 rounded-full transition-all duration-200"
+              className="bg-[var(--gradient-start)] h-2 rounded-full transition-all duration-200"
               style={{ width: `${progress}%` }}
             ></div>
           </div>
-          <div className="text-right text-gray-400 text-sm mt-1">
+          <div className="text-right text-[var(--text-secondary)] text-sm mt-1">
             {progress.toFixed(1)}% completed
+          </div>
+        </div>
+      )}
+      {/* Format Selection Modal */}
+      {isDownloadModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div 
+            className="absolute inset-0 bg-[var(--modal-overlay)] backdrop-blur-sm"
+            onClick={() => setIsDownloadModalOpen(false)}
+          />
+          <div className="relative bg-[var(--modal-bg)] card p-6 w-full max-w-sm">
+            <h3 className="text-lg font-medium text-[var(--text-primary)] mb-4">
+              Choose Format
+            </h3>
+            <div className="space-y-2">
+              <button
+                onClick={() => handleDownload('md')}
+                className="w-full p-4 rounded-lg bg-[var(--card-bg)]
+                         border border-[var(--card-border)] 
+                         hover:border-[var(--gradient-start)]/50 
+                         transition-all duration-300
+                         text-left group"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 rounded-lg gradient-button">
+                    <span className="text-white text-lg">.md</span>
+                  </div>
+                  <div>
+                    <div className="font-medium text-[var(--text-primary)]">Markdown</div>
+                    <div className="text-sm text-[var(--text-secondary)]">
+                      Formatted with headers and styling
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       )}

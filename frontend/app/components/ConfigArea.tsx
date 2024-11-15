@@ -23,8 +23,6 @@ const ConfigArea = memo(function ConfigArea({
         <LanguageSelector
           value={language}
           onChange={onLanguageChange}
-          numSpeakers={numSpeakers}
-          onNumSpeakersChange={onNumSpeakersChange}
           disabled={disabled}
         />
       </div>

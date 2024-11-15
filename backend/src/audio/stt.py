@@ -1,324 +1,295 @@
-import time
-from typing import Optional, Dict, List, Any, Generator
-
-from tqdm import tqdm
-from pydub import AudioSegment
-import torch
-import torch.nn.functional as F
-import numpy as np
 import threading
+import time
+from typing import Any, Dict, Generator, List, Optional
 
-from src.audio.preprocess import read_audio, load_audio_segment
+import numpy as np
+import torch
+from pydub import AudioSegment  # type: ignore
+from tqdm import tqdm
+
 from src.audio.diarization import DiarizationProcessor
-from src.audio.transcription import TranscriptionProcessor
-from src.audio.utils import merge_segments
-from src.configuration.environment import (
-    MODEL_ID,
-    MAX_CHUNK_LENGTH_MS,
-    MIN_CHUNK_LENGTH_MS,
-)
-from src.configuration.log import get_logger
+from src.audio.preprocess import load_audio_segment, read_audio
 from src.audio.recorder import AudioRecorder
+from src.audio.transcription.transcription_factory import create_transcription_processor
+
+# from backend.src.audio.transcription_old import TranscriptionProcessor
+from src.audio.utils import merge_segments
+from src.configuration.environment import MAX_CHUNK_LENGTH_MS, MIN_CHUNK_LENGTH_MS, MODEL_ID
+from src.configuration.model_config import AVAILABLE_MODELS
+from src.configuration.log import get_logger
+
 
 class SpeechToText:
+  """
+  HuggingFace Speech to Text Class with Speaker Diarization.
+  """
+
+  def __init__(
+    self,
+    model_name: Optional[str] = MODEL_ID,
+    language: Optional[str] = None,
+    device: str = "infer",
+    input_file: Optional[str] = None,
+    batch_size: int = 32,
+    num_speakers: Optional[int] = None,
+    verbose: bool = False,
+  ):
+    self.logger = get_logger()
+    self.device = self._infer_device() if device == "infer" else device
+    self.logger.info(f"Using device: {self.device}")
+    self.verbose = verbose
+    self.input_file = input_file
+    self.language = language
+    self.batch_size = batch_size
+    self.num_speakers = None if num_speakers == 1 else num_speakers
+
+    # Get model configuration based on model_type
+    if model_name in AVAILABLE_MODELS:
+      self.model_config = AVAILABLE_MODELS[model_name]
+    else:
+      # Default to Whisper configuration
+      self.model_config = AVAILABLE_MODELS["whisper"]
+      self.logger.warning(f"Model {model_name} not found in configurations, using default Whisper model")
+
+    # Initialize processors
+    self.diarization_processor = DiarizationProcessor(self.device, self.num_speakers)
+    self.transcription_processor = create_transcription_processor(self.model_config, self.device, self.language)
+    # Add a flag to control the transcription loop
+    self.is_running = False
+
+  def _infer_device(self) -> str:
     """
-    HuggingFace Speech to Text Class with Speaker Diarization.
+    Infer the device to use based on availability.
     """
+    if torch.cuda.is_available():
+      return "cuda"
+    elif torch.backends.mps.is_available():
+      return "mps"
+    else:
+      return "cpu"
 
-    def __init__(
-        self,
-        model: Optional[str] = MODEL_ID,
-        language: Optional[str] = None,
-        device: Optional[str] = "infer",
-        input_file: Optional[str] = None,
-        batch_size: int = 32,
-        num_speakers: Optional[int] = None,
-        verbose: bool = False,
-    ):
-        self.logger = get_logger()
-        self.device = self._infer_device() if device == "infer" else device
-        self.logger.info(f"Using device: {self.device}")
-        self.verbose = verbose
-        self.input_file = input_file
-        self.language = language
-        self.batch_size = batch_size
-        self.num_speakers = None if num_speakers == 1 else num_speakers
-        self.model = model
+  def _update_settings(self, language: str, num_speakers: int):
+    self.language = language
+    self.num_speakers = num_speakers
+    self.diarization_processor = DiarizationProcessor(self.device, self.num_speakers)
+    self.transcription_processor = create_transcription_processor(self.model_config, self.device, self.language)
 
-        # Initialize processors
-        self.diarization_processor = DiarizationProcessor(self.device, self.num_speakers)
-        self.transcription_processor = TranscriptionProcessor(self.model, self.device, self.language)
+  def transcribe(self, input_file: Optional[str] = None, frame_rate: int = 16000) -> Generator[Dict[str, Any], None, None]:
+    """
+    Transcribe an audio file and perform speaker diarization,
+    yielding transcription results as they are processed.
+    """
+    self.logger.info("Transcribing audio file ...")
+    start_time = time.time()
+    if input_file is None:
+      input_file = self.input_file
 
-        # Add a flag to control the transcription loop
-        self.is_running = False
+    assert input_file is not None, "Input file is required"
 
-    def _infer_device(self) -> str:
-        """
-        Infer the device to use based on availability.
-        """
-        if torch.cuda.is_available():
-            return "cuda"
-        elif torch.backends.mps.is_available():
-            return "mps"
-        else:
-            return "cpu"
+    # Constants for chunk size control
+    max_chunk_length = int(MAX_CHUNK_LENGTH_MS)
+    min_chunk_length = int(MIN_CHUNK_LENGTH_MS)
 
-    def _update_settings(self, language: str, num_speakers: int):
-        self.language = language
-        self.num_speakers = num_speakers
-        self.diarization_processor = DiarizationProcessor(self.device, self.num_speakers)
-        self.transcription_processor = TranscriptionProcessor(self.model, self.device, self.language)
+    try:
+      # Read audio for both transcription and diarization
+      waveform, sample_rate = read_audio(input_file, self.device)
+      audio = load_audio_segment(input_file)
+      total_duration = len(audio) / 1000.0  # Duration in seconds
 
-    def transcribe(self, input_file: Optional[str] = None, frame_rate: int = 16000) -> Generator[Dict[str, Any], None, None]:
-        """
-        Transcribe an audio file and perform speaker diarization,
-        yielding transcription results as they are processed.
-        """
-        self.logger.info("Transcribing audio file ...")
-        start_time = time.time()
-        if input_file is None:
-            input_file = self.input_file
+      # Yield initial progress
+      yield {"type": "progress", "progress": 10}
 
-        # Constants for chunk size control
-        max_chunk_length = int(MAX_CHUNK_LENGTH_MS)
-        min_chunk_length = int(MIN_CHUNK_LENGTH_MS)
+      # Perform speaker diarization
+      diarization = self.diarization_processor.perform_diarization(waveform, sample_rate)
+      diarization_segments = self.diarization_processor.process_diarization_segments(diarization)
 
-        try:
-            # Read audio for both transcription and diarization
-            waveform, sample_rate = read_audio(input_file, self.device)
-            audio = load_audio_segment(input_file)
-            total_duration = len(audio) / 1000.0  # Duration in seconds
+      # Yield diarization progress
+      yield {"type": "progress", "progress": 30}
 
-            # Yield initial progress
-            yield {"type": "progress", "progress": 10}
+      # Process segments and yield results
+      yield from self._process_segments(diarization_segments, audio, frame_rate, max_chunk_length, min_chunk_length, total_duration)
 
-            # Perform speaker diarization
-            diarization = self.diarization_processor.perform_diarization(waveform, sample_rate)
-            diarization_segments = self.diarization_processor.process_diarization_segments(diarization)
-            
-            # Yield diarization progress
-            yield {"type": "progress", "progress": 30}
+      # Final progress update
+      yield {"type": "progress", "progress": 100}
 
-            # Process segments and yield results
-            yield from self._process_segments(
-                diarization_segments,
-                audio,
-                frame_rate,
-                max_chunk_length,
-                min_chunk_length,
-                total_duration
-            )
+      end_time = time.time()
+      self.logger.info(f"Transcription completed in {end_time - start_time:.2f} seconds")
 
-            # Final progress update
-            yield {"type": "progress", "progress": 100}
+    except Exception as e:
+      self.logger.error(f"Transcription error: {str(e)}")
+      yield {"type": "error", "error": str(e)}
 
-            end_time = time.time()
-            self.logger.info(f"Transcription completed in {end_time - start_time:.2f} seconds")
+  # Existing live transcription methods remain unchanged
+  def transcribe_live(self, chunk_duration_ms: int = 2000, save_debug: bool = False):
+    """Live transcription with efficient batch processing"""
+    self.logger.info("Starting live transcription...")
+    self.recorder = AudioRecorder(sample_rate=16000, chunk_size=chunk_duration_ms, channels=1)
+    self.recorder.start_recording()
+    self.is_running = True
 
-        except Exception as e:
-            self.logger.error(f"Transcription error: {str(e)}")
-            yield {"type": "error", "error": str(e)}
+    try:
+      buffer = []
+      buffer_duration_ms = 0.0
+      total_processed_duration = 0.0
 
-    # Existing live transcription methods remain unchanged
-    def transcribe_live(self, chunk_duration_ms: int = 2000, save_debug: bool = False):
-        """Live transcription with efficient batch processing"""
-        self.logger.info("Starting live transcription...")
-        self.recorder = AudioRecorder(sample_rate=16000, chunk_size=chunk_duration_ms, channels=1)
-        self.recorder.start_recording()
-        self.is_running = True
-        
-        try:
-            buffer = []
-            buffer_duration_ms = 0
-            total_processed_duration = 0
-            
-            while self.is_running:
-                chunk = self.recorder.get_audio_chunk(timeout=0.1)
-                if chunk is None:
-                    continue
-                
-                buffer.append(chunk)
-                buffer_duration_ms += (len(chunk) * 1000) / self.recorder.sample_rate
-                
-                if buffer_duration_ms >= chunk_duration_ms:
-                    # Process the buffer
-                    audio_data = np.concatenate(buffer)
-                    waveform = torch.from_numpy(audio_data).float() / 32768.0
-                    waveform = waveform.unsqueeze(0)
-                    
-                    # Get speaker segments
-                    diarization = self.diarization_processor.perform_diarization(
-                        waveform, self.recorder.sample_rate
-                    )
-                    segments = self.diarization_processor.process_diarization_segments(diarization)
-                    
-                    # Create AudioSegment
-                    audio_segment = AudioSegment(
-                        audio_data.tobytes(),
-                        frame_rate=self.recorder.sample_rate,
-                        sample_width=2,
-                        channels=1
-                    )
-                    
-                    # Process segments efficiently using batching
-                    transcribed_segments = self._process_live_transcription(segments, audio_segment, self.recorder.sample_rate)
-                    
-                    # Stream results
-                    for segment in transcribed_segments:
-                        yield {
-                            "start": total_processed_duration + segment["start"],
-                            "end": total_processed_duration + segment["end"],
-                            "text": segment["text"],
-                            "speaker": segment["speaker"]
-                        }
-                    
-                    total_processed_duration += buffer_duration_ms / 1000
-                    buffer = []
-                    buffer_duration_ms = 0
-                    
-        finally:
-            if hasattr(self, 'recorder'):
-                self.recorder.stop_recording()
-                self.recorder = None
+      while self.is_running:
+        chunk = self.recorder.get_audio_chunk(timeout=0.1)
+        if chunk is None:
+          continue
 
-    def _process_live_transcription(self, segments, audio_segment, frame_rate):
-        """
-        Process segments during live transcription.
-        """
-        # Since this is synchronous, we can't await; process segments directly
-        transcribed_segments = []
-        current_batch = {
-            "chunks": [],
-            "metadata": [],
-        }
+        buffer.append(chunk)
+        buffer_duration_ms += (len(chunk) * 1000) / self.recorder.sample_rate
 
-        for turn, _, speaker in segments:
-            start_ms = int(turn.start * 1000)
-            end_ms = int(turn.end * 1000)
-            
-            chunk = audio_segment[start_ms:end_ms]
-            current_batch["chunks"].append(chunk)
-            current_batch["metadata"].append({
-                "start": turn.start,
-                "end": turn.end,
-                "speaker": speaker,
-            })
+        if buffer_duration_ms >= chunk_duration_ms:
+          # Process the buffer
+          audio_data = np.concatenate(buffer)
+          waveform = torch.from_numpy(audio_data).float() / 32768.0
+          waveform = waveform.unsqueeze(0)
 
-        if current_batch["chunks"]:
-            batch_transcriptions = self.transcription_processor.transcribe_chunks_batch(
-                current_batch["chunks"],
-                current_batch["metadata"],
-                frame_rate
-            )
-            transcribed_segments.extend(batch_transcriptions)
+          # Get speaker segments
+          diarization = self.diarization_processor.perform_diarization(waveform, self.recorder.sample_rate)
+          segments = self.diarization_processor.process_diarization_segments(diarization)
 
-        return transcribed_segments
+          # Create AudioSegment
+          audio_segment = AudioSegment(audio_data.tobytes(), frame_rate=self.recorder.sample_rate, sample_width=2, channels=1)
 
-    def stop_live_transcription(self):
-        """
-        Stop the live transcription by setting the flag and stopping the recorder.
-        """
-        self.logger.info("Stopping live transcription...")
-        self.is_running = False
-        
-        # Stop the recorder immediately in a separate thread to prevent blocking
-        def stop_recorder():
-            if hasattr(self, 'recorder') and self.recorder:
-                self.recorder.stop_recording()
-                self.recorder = None
-        
-        threading.Thread(target=stop_recorder).start()
+          # Process segments efficiently using batching
+          transcribed_segments = self._process_live_transcription(segments, audio_segment, self.recorder.sample_rate)
 
-    def _process_segments(
-        self,
-        diarization_segments: List[Any],
-        audio: AudioSegment,
-        frame_rate: int,
-        max_chunk_length: int,
-        min_chunk_length: int,
-        total_duration: float
-    ) -> Generator[Dict[str, Any], None, None]:
-        """
-        Process diarization segments and transcribe the audio accordingly using batching.
-        Yields progress and transcription results.
-        """
+          # Stream results
+          for segment in transcribed_segments:
+            yield {
+              "start": total_processed_duration + segment["start"],
+              "end": total_processed_duration + segment["end"],
+              "text": segment["text"],
+              "speaker": segment["speaker"],
+            }
+
+          total_processed_duration += buffer_duration_ms / 1000
+          buffer = []
+          buffer_duration_ms = 0
+
+    finally:
+      if hasattr(self, "recorder"):
+        self.recorder.stop_recording()
+        del self.recorder
+
+  def _process_live_transcription(self, segments, audio_segment, frame_rate):
+    """
+    Process segments during live transcription.
+    """
+    # Since this is synchronous, we can't await; process segments directly
+    transcribed_segments = []
+    current_batch = {
+      "chunks": [],
+      "metadata": [],
+    }
+
+    for turn, _, speaker in segments:
+      start_ms = int(turn.start * 1000)
+      end_ms = int(turn.end * 1000)
+
+      chunk = audio_segment[start_ms:end_ms]
+      current_batch["chunks"].append(chunk)
+      current_batch["metadata"].append({
+        "start": turn.start,
+        "end": turn.end,
+        "speaker": speaker,
+      })
+
+    if current_batch["chunks"]:
+      batch_transcriptions = self.transcription_processor.transcribe_chunks_batch(
+        current_batch["chunks"], current_batch["metadata"], frame_rate
+      )
+      transcribed_segments.extend(batch_transcriptions)
+
+    return transcribed_segments
+
+  def stop_live_transcription(self):
+    """
+    Stop the live transcription by setting the flag and stopping the recorder.
+    """
+    self.logger.info("Stopping live transcription...")
+    self.is_running = False
+
+    # Stop the recorder immediately in a separate thread to prevent blocking
+    def stop_recorder():
+      if hasattr(self, "recorder") and self.recorder:
+        self.recorder.stop_recording()
+        self.recorder = None
+
+    threading.Thread(target=stop_recorder).start()
+
+  def _process_segments(
+    self,
+    diarization_segments: List[Any],
+    audio: AudioSegment,
+    frame_rate: int,
+    max_chunk_length: int,
+    min_chunk_length: int,
+    total_duration: float,
+  ) -> Generator[Dict[str, Any], None, None]:
+    """
+    Process diarization segments and transcribe the audio accordingly using batching.
+    Yields progress and transcription results.
+    """
+    current_batch: List[Dict[str, Any]] = []
+    last_speaker = None
+    last_end = 0.0
+    progress = 30.0
+
+    for turn, _, speaker in tqdm(diarization_segments, desc="Processing segments"):
+      start_ms = int(turn.start * 1000)
+      end_ms = int(turn.end * 1000)
+      duration = end_ms - start_ms
+
+      # Skip if segment overlaps significantly with previous
+      if turn.start < last_end:
+        continue
+
+      # Handle segments based on duration
+      if duration < min_chunk_length:
+        # Try to merge with previous segment if same speaker
+        if current_batch and last_speaker == speaker:
+          prev = current_batch[-1]
+          prev["end_ms"] = end_ms
+          continue
+
+      if duration > max_chunk_length:
+        # Split long segments
+        for chunk_start in range(start_ms, end_ms, max_chunk_length):
+          chunk_end = min(chunk_start + max_chunk_length, end_ms)
+          current_batch.append({"start_ms": chunk_start, "end_ms": chunk_end, "speaker": speaker})
+      else:
+        current_batch.append({"start_ms": start_ms, "end_ms": end_ms, "speaker": speaker})
+
+      # Process batch if full
+      if len(current_batch) >= self.batch_size:
+        chunks = [audio[seg["start_ms"] : seg["end_ms"]] for seg in current_batch]
+        metadata = [{"start": seg["start_ms"] / 1000, "end": seg["end_ms"] / 1000, "speaker": seg["speaker"]} for seg in current_batch]
+
+        transcribed_segments = self.transcription_processor.transcribe_chunks_batch(chunks, metadata, frame_rate)
+        merged_segments = merge_segments(transcribed_segments)
+
+        for segment in merged_segments:
+          yield {"type": "transcription", "data": segment}
+
+        # Update progress
+        progress = min(30.0 + (last_end / total_duration * 70.0), 100.0)
+        yield {"type": "progress", "progress": progress}
+
         current_batch = []
-        last_speaker = None
-        last_end = 0
-        progress = 30
 
-        for turn, _, speaker in tqdm(diarization_segments, desc="Processing segments"):
-            start_ms = int(turn.start * 1000)
-            end_ms = int(turn.end * 1000)
-            duration = end_ms - start_ms
+      last_speaker = speaker
+      last_end = turn.end
 
-            # Skip if segment overlaps significantly with previous
-            if turn.start < last_end:
-                continue
+    # Process remaining segments
+    if current_batch:
+      chunks = [audio[seg["start_ms"] : seg["end_ms"]] for seg in current_batch]
+      metadata = [{"start": seg["start_ms"] / 1000, "end": seg["end_ms"] / 1000, "speaker": seg["speaker"]} for seg in current_batch]
 
-            # Handle segments based on duration
-            if duration < min_chunk_length:
-                # Try to merge with previous segment if same speaker
-                if current_batch and last_speaker == speaker:
-                    prev = current_batch[-1]
-                    prev["end_ms"] = end_ms
-                    continue
+      transcribed_segments = self.transcription_processor.transcribe_chunks_batch(chunks, metadata, frame_rate)
+      merged_segments = merge_segments(transcribed_segments)
 
-            if duration > max_chunk_length:
-                # Split long segments
-                for chunk_start in range(start_ms, end_ms, max_chunk_length):
-                    chunk_end = min(chunk_start + max_chunk_length, end_ms)
-                    current_batch.append({
-                        "start_ms": chunk_start,
-                        "end_ms": chunk_end,
-                        "speaker": speaker
-                    })
-            else:
-                current_batch.append({
-                    "start_ms": start_ms,
-                    "end_ms": end_ms,
-                    "speaker": speaker
-                })
-
-            # Process batch if full
-            if len(current_batch) >= self.batch_size:
-                chunks = [audio[seg["start_ms"]:seg["end_ms"]] for seg in current_batch]
-                metadata = [{
-                    "start": seg["start_ms"] / 1000,
-                    "end": seg["end_ms"] / 1000,
-                    "speaker": seg["speaker"]
-                } for seg in current_batch]
-                
-                transcribed_segments = self.transcription_processor.transcribe_chunks_batch(
-                    chunks, metadata, frame_rate
-                )
-                merged_segments = merge_segments(transcribed_segments)
-                
-                for segment in merged_segments:
-                    yield {"type": "transcription", "data": segment}
-                
-                # Update progress
-                progress = min(30 + (last_end / total_duration * 70), 100)
-                yield {"type": "progress", "progress": progress}
-                
-                current_batch = []
-
-            last_speaker = speaker
-            last_end = turn.end
-
-        # Process remaining segments
-        if current_batch:
-            chunks = [audio[seg["start_ms"]:seg["end_ms"]] for seg in current_batch]
-            metadata = [{
-                "start": seg["start_ms"] / 1000,
-                "end": seg["end_ms"] / 1000,
-                "speaker": seg["speaker"]
-            } for seg in current_batch]
-            
-            transcribed_segments = self.transcription_processor.transcribe_chunks_batch(
-                chunks, metadata, frame_rate
-            )
-            merged_segments = merge_segments(transcribed_segments)
-            
-            for segment in merged_segments:
-                yield {"type": "transcription", "data": segment}
+      for segment in merged_segments:
+        yield {"type": "transcription", "data": segment}

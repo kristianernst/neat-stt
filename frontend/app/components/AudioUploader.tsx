@@ -47,8 +47,8 @@ export default function AudioUploader({
         relative rounded-xl border-2 border-dashed p-8 text-center
         transition-all duration-300 ease-in-out
         ${dragActive 
-          ? 'border-[#ff7eb3] bg-gradient-to-r from-[#ff7eb3]/10 to-[#8957ff]/10 shadow-lg shadow-purple-500/20' 
-          : 'border-gray-800 hover:border-[#ff7eb3]/50 bg-gray-900/50'}
+          ? 'border-[var(--gradient-start)] bg-[var(--gradient-start)]/5 shadow-lg shadow-[var(--gradient-start)]/20' 
+          : 'border-[var(--card-border)] hover:border-[var(--gradient-start)]/50 bg-[var(--card-bg)]'}
         backdrop-blur-sm
       `}
       onDragEnter={handleDrag}
@@ -85,8 +85,8 @@ export default function AudioUploader({
                         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
-              <p className="text-lg">Drop your audio file here, or click to select</p>
-              <p className="text-sm text-gray-500">MP3, WAV, M4A up to 10MB</p>
+              <p className="text-lg text-[var(--text-primary)]">Drop your audio file here, or click to select</p>
+              <p className="text-sm text-[var(--text-secondary)]">MP3, WAV, M4A up to 10MB</p>
             </>
           )}
         </div>

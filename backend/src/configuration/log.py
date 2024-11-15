@@ -1,9 +1,9 @@
-import logging
 import json
+import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
-from src.configuration.environment import LOG_LEVEL, APPLICATION_NAME
+from src.configuration.environment import APPLICATION_NAME, LOG_LEVEL
 
 
 class JsonFormatter(logging.Formatter):
@@ -35,7 +35,7 @@ class JsonFormatter(logging.Formatter):
     return json.dumps(log_data)
 
 
-def get_logger(name: Optional[str] = None, level: str = LOG_LEVEL) -> logging.Logger:
+def get_logger(name: Optional[str] = None, level: Optional[Union[str, int]] = LOG_LEVEL) -> logging.Logger:
   """
   Get a configured logger with JSON formatting.
 
@@ -50,7 +50,9 @@ def get_logger(name: Optional[str] = None, level: str = LOG_LEVEL) -> logging.Lo
     name = APPLICATION_NAME
 
   logger = logging.getLogger(name)
-  logger.setLevel(level)
+
+  if level is not None:
+    logger.setLevel(level)
 
   # Check if the logger already has handlers configured
   if not logger.handlers:
