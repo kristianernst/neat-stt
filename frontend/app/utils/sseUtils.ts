@@ -28,14 +28,20 @@ export async function processSSEStream(
               const data = JSON.parse(dataLine.slice(6));
               
               // Handle segment concatenation for transcription events
-              if (eventType === 'transcription' && lastSegment && lastSegment.speaker === data.speaker) {
-                // Concatenate with previous segment
-                lastSegment.text = `${lastSegment.text} ${data.text}`.trim();
-                lastSegment.end = data.end;
-                onEvent(eventType, lastSegment);
+              if (eventType === 'transcription') {
+                if (lastSegment && lastSegment.speaker === data.speaker && 
+                    Math.abs(lastSegment.end - data.start) < 0.5) { // Add time threshold check
+                  // Concatenate with previous segment only if they're close in time
+                  lastSegment.text = `${lastSegment.text} ${data.text}`.trim();
+                  lastSegment.end = data.end;
+                  onEvent(eventType, lastSegment);
+                } else {
+                  // New speaker or time gap too large
+                  lastSegment = { ...data };
+                  onEvent(eventType, data);
+                }
               } else {
-                // New speaker or different event type
-                lastSegment = eventType === 'transcription' ? { ...data } : null;
+                lastSegment = null;
                 onEvent(eventType, data);
               }
             } catch (e) {

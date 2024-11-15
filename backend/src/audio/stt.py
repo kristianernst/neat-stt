@@ -10,9 +10,12 @@ from tqdm import tqdm
 from src.audio.diarization import DiarizationProcessor
 from src.audio.preprocess import load_audio_segment, read_audio
 from src.audio.recorder import AudioRecorder
-from src.audio.transcription import TranscriptionProcessor
+from src.audio.transcription.transcription_factory import create_transcription_processor
+
+# from backend.src.audio.transcription_old import TranscriptionProcessor
 from src.audio.utils import merge_segments
 from src.configuration.environment import MAX_CHUNK_LENGTH_MS, MIN_CHUNK_LENGTH_MS, MODEL_ID
+from src.configuration.model_config import AVAILABLE_MODELS
 from src.configuration.log import get_logger
 
 
@@ -23,7 +26,7 @@ class SpeechToText:
 
   def __init__(
     self,
-    model: Optional[str] = MODEL_ID,
+    model_name: Optional[str] = MODEL_ID,
     language: Optional[str] = None,
     device: str = "infer",
     input_file: Optional[str] = None,
@@ -39,19 +42,18 @@ class SpeechToText:
     self.language = language
     self.batch_size = batch_size
     self.num_speakers = None if num_speakers == 1 else num_speakers
-    if model is not None:
-      self.model = model
-    else:
-      raise ValueError("Model is required, please specify a model")
 
-    if self.device not in ["cuda", "mps", "cpu"]:
-      self.logger.warning(f"Invalid device: {self.device}, defaulting to CPU")
-      self.device = "cpu"
+    # Get model configuration based on model_type
+    if model_name in AVAILABLE_MODELS:
+      self.model_config = AVAILABLE_MODELS[model_name]
+    else:
+      # Default to Whisper configuration
+      self.model_config = AVAILABLE_MODELS["whisper"]
+      self.logger.warning(f"Model {model_name} not found in configurations, using default Whisper model")
 
     # Initialize processors
     self.diarization_processor = DiarizationProcessor(self.device, self.num_speakers)
-    self.transcription_processor = TranscriptionProcessor(self.model, self.device, self.language)
-
+    self.transcription_processor = create_transcription_processor(self.model_config, self.device, self.language)
     # Add a flag to control the transcription loop
     self.is_running = False
 
@@ -70,7 +72,7 @@ class SpeechToText:
     self.language = language
     self.num_speakers = num_speakers
     self.diarization_processor = DiarizationProcessor(self.device, self.num_speakers)
-    self.transcription_processor = TranscriptionProcessor(self.model, self.device, self.language)
+    self.transcription_processor = create_transcription_processor(self.model_config, self.device, self.language)
 
   def transcribe(self, input_file: Optional[str] = None, frame_rate: int = 16000) -> Generator[Dict[str, Any], None, None]:
     """

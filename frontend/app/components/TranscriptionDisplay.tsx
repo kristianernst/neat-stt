@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import type { TranscriptionSegment } from '../utils/transcription-formatter';
 import { formatTranscription } from '../utils/transcription-formatter';
 import { FiCopy, FiDownload } from 'react-icons/fi';
+import debounce from 'lodash/debounce';
 
 interface TranscriptionDisplayProps {
   isLiveMode: boolean;
@@ -67,7 +68,13 @@ export default memo(function TranscriptionDisplay({
   };
 
   const handleDownload = (format: 'md' | 'txt') => {
-    const formattedContent = formatTranscription(segments, format);
+    // Create a deep copy of segments to prevent any state issues
+    const segmentsCopy = JSON.parse(JSON.stringify(segments));
+    
+    // Sort segments by start time to ensure correct order
+    segmentsCopy.sort((a: TranscriptionSegment, b: TranscriptionSegment) => (a.start || 0) - (b.start || 0));
+    
+    const formattedContent = formatTranscription(segmentsCopy, format);
     const blob = new Blob([formattedContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -95,22 +102,25 @@ export default memo(function TranscriptionDisplay({
     if (!data) return;
 
     setSegments(prev => {
-      // Check if this is a new speaker or continuation
-      if (prev.length > 0 && prev[prev.length - 1].speaker === data.speaker) {
-        const newSegments = [...prev];
-        const lastSegment = { ...newSegments[newSegments.length - 1] };
-        lastSegment.text = `${lastSegment.text} ${data.text}`.trim();
-        lastSegment.end = data.end;
-        newSegments[newSegments.length - 1] = lastSegment;
-        onSegmentsUpdate?.(newSegments);
-        return newSegments;
+      const newSegments = [...prev];
+      const existingIndex = newSegments.findIndex(seg => 
+        seg.start === data.start && 
+        seg.speaker === data.speaker
+      );
+
+      if (existingIndex !== -1) {
+        newSegments[existingIndex] = {
+          ...newSegments[existingIndex],
+          text: data.text,
+          end: data.end
+        };
+      } else {
+        newSegments.push({ ...data });
       }
       
-      const newSegments = [...prev, data];
-      onSegmentsUpdate?.(newSegments);
       return newSegments;
     });
-  }, [onSegmentsUpdate]);
+  }, []);
 
   const handleProgressEvent = useCallback((event: MessageEvent) => {
     const data = event.data ? JSON.parse(event.data) : {};
@@ -204,6 +214,19 @@ export default memo(function TranscriptionDisplay({
       }, 500);
     }
   }, [segments.length === 1]); // Only trigger on first segment
+
+  const debouncedSetSegments = useCallback(
+    debounce((newSegments: TranscriptionSegment[]) => {
+      setSegments(newSegments);
+    }, 100),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      setSegments([]);
+    };
+  }, []);
 
   if (isInitializing && isLiveMode) {
     return (
@@ -323,20 +346,28 @@ export default memo(function TranscriptionDisplay({
         {/* Content */}
         {segments.map((segment, index) => (
           <div
-            key={`${index}`}
-            className="space-y-2 hover:bg-[var(--card-hover)] p-3 rounded-lg transition-all duration-200"
+            key={`${segment.speaker}-${segment.start}-${segment.end}`}
+            className="space-y-2 p-3 rounded-lg"
           >
-            <div className="text-sm gradient-text font-mono">
-              {segment.start !== undefined && segment.end !== undefined
-                ? `[${formatTime(segment.start)} -> ${formatTime(segment.end)}]`
-                : segment.timestamp || null}
+            {/* Metadata line (timestamp + speaker) */}
+            <div className="flex items-center gap-2 text-sm">
+              <span className="gradient-text font-mono">
+                {segment.start !== undefined && segment.end !== undefined
+                  ? `[${formatTime(segment.start)} -> ${formatTime(segment.end)}]`
+                  : segment.timestamp || null}
+              </span>
+              {segment.speaker && (
+                <>
+                  <span className="text-[var(--text-secondary)]">•</span>
+                  <span className="font-medium text-[var(--gradient-start)]">
+                    {segment.speaker}
+                  </span>
+                </>
+              )}
             </div>
-            <div className="text-[var(--text-primary)] leading-relaxed font-serif">
-              {segment.speaker ? (
-                <span className="font-medium text-[var(--gradient-start)]">
-                  {segment.speaker}:
-                </span>
-              ) : null}{' '}
+
+            {/* Text content on new line */}
+            <div className="text-[var(--text-primary)] leading-relaxed font-serif pl-4">
               {segment.text}
             </div>
           </div>

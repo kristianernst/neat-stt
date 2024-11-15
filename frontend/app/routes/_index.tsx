@@ -64,13 +64,24 @@ export default function Index() {
             break;
           case "transcription":
             setSegments(prev => {
-              // If this is an update to the last segment, replace it
-              if (prev.length > 0 && prev[prev.length - 1].speaker === eventData.speaker) {
+              // Check if this segment already exists
+              const existingIndex = prev.findIndex(seg => 
+                seg.start === eventData.start && 
+                seg.speaker === eventData.speaker
+              );
+
+              if (existingIndex !== -1) {
+                // Update existing segment
                 const newSegments = [...prev];
-                newSegments[newSegments.length - 1] = eventData;
+                newSegments[existingIndex] = {
+                  ...newSegments[existingIndex],
+                  text: eventData.text,
+                  end: eventData.end
+                };
                 return newSegments;
               }
-              // Otherwise add as new segment
+
+              // Add new segment
               return [...prev, eventData];
             });
             break;
