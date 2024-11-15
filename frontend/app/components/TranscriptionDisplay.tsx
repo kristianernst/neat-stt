@@ -103,18 +103,24 @@ export default memo(function TranscriptionDisplay({
 
     setSegments(prev => {
       const newSegments = [...prev];
-      const existingIndex = newSegments.findIndex(seg => 
-        seg.start === data.start && 
-        seg.speaker === data.speaker
-      );
+      // Find the last segment from the same speaker
+      const lastSegmentIndex = newSegments.length - 1;
+      const lastSegment = lastSegmentIndex >= 0 ? newSegments[lastSegmentIndex] : null;
 
-      if (existingIndex !== -1) {
-        newSegments[existingIndex] = {
-          ...newSegments[existingIndex],
-          text: data.text,
+      // Check if we should merge with the last segment
+      if (lastSegment && 
+          lastSegment.speaker === data.speaker && 
+          // Only merge if the gap is less than 5 minutes (300 seconds)
+          Math.abs(lastSegment.end - data.start) < 300) {
+        
+        // Update the last segment instead of creating a new one
+        newSegments[lastSegmentIndex] = {
+          ...lastSegment,
+          text: `${lastSegment.text} ${data.text}`.trim(),
           end: data.end
         };
       } else {
+        // Add as new segment if it's a different speaker or time gap is too large
         newSegments.push({ ...data });
       }
       
