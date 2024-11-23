@@ -3,6 +3,8 @@ from dataclasses import dataclass
 
 ModelType = Literal["whisper", "mms", "other"]
 
+# Model configuration for transcription models.
+
 
 @dataclass
 class ModelConfig:

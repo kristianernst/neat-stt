@@ -1,11 +1,23 @@
 # neat-stt 🎙️
 
-A modern speech-to-text (STT) service with a sleek frontend built using Remix and a powerful backend powered by FastAPI. This project combines state-of-the-art machine learning models with a beautiful, responsive user interface.
+A modern speech-to-text (STT) and note-taking service.
+This project combines state-of-the-art machine learning models with a beautiful, responsive user interface.
+
+Built and developed for Silicon Macs (I have an M1 Max), but should work on other platforms as well.
+
+How it works on a very simple level:
+
+```mermaid
+flowchart LR;
+  a["audio"] --> b["neat-stt"]
+  b --> c["diarized transcript and notes"]
+```
 
 ## Features ✨
 
 - Audio transcription (will implement real time later)
 - Speaker diarization (speaker identification)
+- LLM-based note generation
 - Beautiful, animated UI with a modern dark theme
 - Multi-language support
 - Configurable number of speakers
@@ -19,60 +31,20 @@ A modern speech-to-text (STT) service with a sleek frontend built using Remix an
 - Tailwind CSS - Utility-first CSS framework
 - React - UI library
 
-### Backend
+### Backend (python)
 - FastAPI - Modern Python web framework
 - Whisper - OpenAI's speech recognition model
 - PyAnnote - Speaker diarization
 - PyTorch - Machine learning framework
+- Llama.cpp - Large language model inference
+- HuggingFace transformers - Machine learning models
 
 ![ui](./assets/ui.png)
 
 ## Getting Started 🚀
 
-### Prerequisites
-- Node.js >= 20.0.0
-- Python >= 3.8
-- pip
+See [docs/setup.md](./docs/setup.md) for more details.
 
-### Backend Setup
-
-1. Navigate to the backend directory:
-bash
-cd backend
-
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-
-3. Create a `.env` file with your configuration
-
-4. Start the backend server:
-```bash
-uvicorn src.main:app --reload
-```
-
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
-```bash
-cd frontend
-```
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the frontend server:
-```bash
-npm run dev
-```
-
-
-The application will be available at `http://localhost:5173`
 
 ## Development 🔧
 
@@ -103,3 +75,6 @@ Contributions are welcome! Feel free to submit issues and pull requests.
 - OpenAI's Whisper model for speech recognition
 - PyAnnote for speaker diarization
 - The Remix team for their excellent web framework
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) for the large language model inference
+- [HuggingFace](https://huggingface.co/) for the machine learning models
+- [Cursor](https://www.cursor.com/) for the code editor that turned me from a backend developer into a full-stack developer with the power of "tabtabtabtab" lol.
