@@ -11,10 +11,10 @@ from src.lm.classifier import TranscriptClassifier
 class RecapGenerator:
   def __init__(
     self,
-    max_tokens: int = 4000,
-    max_chunk_length: int = 1000,
+    max_tokens: int = 8000,
+    max_chunk_length: int = 1500,
     chunk_strategy: str = "semantic",
-    max_context_length: int = 4096,
+    max_context_length: int = 6096,
     buffer: int = 500,
   ):
     self.logger = get_logger()
@@ -26,7 +26,7 @@ class RecapGenerator:
     self.small_llm_client = LLMClient(model_name=SMALL_LLM_MODEL, base_url=SMALL_LLM_ENDPOINT)
     self.large_llm_client = LLMClient(model_name=LARGE_LLM_MODEL, base_url=LARGE_LLM_ENDPOINT)
     self.o1_llm_client = LLMClient(model_name=O1_LLM_MODEL, base_url=O1_LLM_ENDPOINT)
-    self.classifier = TranscriptClassifier(self.small_llm_client)
+    self.classifier = TranscriptClassifier(self.large_llm_client)
 
   def generate_recap(self, transcript: str) -> str:
     self.logger.info("Starting summarization process")
@@ -64,9 +64,9 @@ class RecapGenerator:
       try:
         conversation = [
           {"role": "system", "content": self.scratchpad_inst},
-          {"role": "user", "content": f"Do not hallucinate, only reference the text chunk. Sometimes the transcribed words are not accurate try and infer the actual words. Chunk {i} of {num_chunks}:\n{chunk}"},
+          {"role": "user", "content": f"Sometimes the transcribed words are not accurate try and infer the actual words here is the chunk:\n{chunk}"},
         ]
-        res = self.o1_llm_client.ask(
+        res = self.small_llm_client.ask(
           messages=conversation,
           temperature=0.1,
           max_tokens=self.max_tokens,
@@ -132,7 +132,7 @@ class RecapGenerator:
       ] 
       reflection = self.o1_llm_client.ask(
         messages=msgs,
-        temperature=0.0,
+        temperature=0.3,
         max_tokens=self.max_tokens,
         stream=True,
       )
@@ -149,9 +149,9 @@ class RecapGenerator:
         {"role": "user", "content": f"Here are the notes:\n{scratchpad}"},
         {"role": "user", "content": f"Here is the reflection o1 has made:\n{reflection}"},
       ]
-      recap = self.o1_llm_client.ask(
+      recap = self.large_llm_client.ask(
         messages=msgs,
-        temperature=0.0,
+        temperature=0.2,
         max_tokens=self.max_tokens,
         stream=True,
       )

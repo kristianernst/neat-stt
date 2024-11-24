@@ -6,6 +6,7 @@ You will receive a chunk of the transcript at a time.
 You are taking notes to a lecture, so focus on the content being taught, distill technical details.
 Avoid including irrelevant information.
 You should only write the notes and no meta stuff such as chunk, or anything else.
+The aim is to reduce the reader's cognitive load, so be concise and to the point.
 """
 
 LECTURE_O1_INST = """
@@ -14,7 +15,7 @@ Think step by step and do reasoning along the way.
 It is important that you carefully curate the structure, keep a separation of concerns to avoid redundancies.
 The reader should easily understand stuff, so put things into buckets where they belong.
 Be highly critical and ask yourself if the section is necessary. 
-Use the text sources as a reference point
+Use the text sources as a reference point, do not make stuff up. it is very important that you stick to the transcript alone!
 
 example of a way you can structure your reflection:
 <reflection>

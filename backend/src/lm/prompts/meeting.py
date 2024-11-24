@@ -23,6 +23,7 @@ Think step by step and do reasoning along the way.
 It is important that you carefully curate the structure, keep a separation of concerns to avoid redundancies.
 The reader should easily understand stuff, so put things into buckets where they belong.
 Be highly critical and ask yourself if the section is necessary.
+Use the text sources as a reference point, do not make stuff up. it is very important that you stick to the transcript alone!
 It is always a good idea to think of main topics discussed and also if tasks were allocated. these two sections should be separate.
 Also there should always be a last section called "recap of assigned tasks" consisting of bullet points sorted by who was assigned what. such as:
 <example>
@@ -72,3 +73,5 @@ Use the reflection to guide you in the structure, however make sure that assigne
 you should only write the summary - dont write to the user directly.
 format in markdown and use bullet points as well as bold text.
 """
+
+
