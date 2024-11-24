@@ -10,6 +10,9 @@ import Header from "~/components/shared/Header";
 import Settings from "~/components/settings/Settings";
 import { useOutletContext } from "@remix-run/react";
 import ConfigurationSummary from "~/components/shared/ConfigurationSummary";
+import RecapDisplay from "~/components/recap/RecapDisplay";
+import { serializeTranscript, generateRecap } from '~/utils/recap-utils';
+import AIStarIcon from "~/components/shared/AIStarIcon";
 
 type ContextType = { isDark: boolean; setIsDark: (isDark: boolean) => void };
 
@@ -33,6 +36,8 @@ export default function Index() {
   const [progress, setProgress] = useState(0); // New state for progress
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { isDark, setIsDark } = useOutletContext<ContextType>();
+  const [recap, setRecap] = useState<string>('');
+  const [isGeneratingRecap, setIsGeneratingRecap] = useState(false);
 
   const handleTranscription = async (file: File) => {
     setSelectedFile(file);
@@ -161,6 +166,21 @@ export default function Index() {
     }
   }, [isLiveMode]);
 
+  const handleGenerateRecap = async () => {
+    if (segments.length === 0) return;
+    
+    setIsGeneratingRecap(true);
+    try {
+      const serializedTranscript = serializeTranscript(segments);
+      const recapText = await generateRecap(serializedTranscript);
+      setRecap(recapText);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate recap');
+    } finally {
+      setIsGeneratingRecap(false);
+    }
+  };
+
   return (
     <div className="min-h-screen breathing-background relative">
       <Header isDark={isDark} onThemeChange={setIsDark} />
@@ -219,6 +239,47 @@ export default function Index() {
             progress={progress}
             setProgress={setProgress}
           />
+
+          {segments.length > 0 && !isTranscribing && (
+            <>
+              <button
+                onClick={handleGenerateRecap}
+                disabled={isGeneratingRecap}
+                className="w-full max-w-xs mx-auto py-3 px-4 rounded-xl text-center transition-all duration-300 
+                           disabled:opacity-50 disabled:cursor-not-allowed
+                           bg-gradient-to-r from-blue-400/10 via-pink-400/10 to-salmon-400/10
+                           hover:from-blue-400/20 hover:via-pink-400/20 hover:to-salmon-400/20
+                           border border-blue-400/20 hover:border-pink-400/30
+                           text-[var(--text-primary)]
+                           flex items-center justify-center gap-2"
+              >
+                <AIStarIcon className="w-4 h-4 text-blue-400" />
+                <span 
+                  className="relative font-light"
+                  style={{
+                    background: 'linear-gradient(to right, #60A5FA, #EC4899, #FB7185)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  <span className="absolute inset-0 blur-[0.5px] opacity-50"
+                        style={{
+                          background: 'linear-gradient(to right, #60A5FA, #EC4899, #FB7185)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                        }}>
+                    {isGeneratingRecap ? 'Generating Recap...' : 'Generate AI Recap'}
+                  </span>
+                  {isGeneratingRecap ? 'Generating Recap...' : 'Generate AI Recap'}
+                </span>
+              </button>
+              <RecapDisplay
+                recap={recap}
+                isLoading={isGeneratingRecap}
+              />
+            </>
+          )}
         </div>
       </div>
       <Settings
