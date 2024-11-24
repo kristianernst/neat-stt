@@ -1,15 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
 import type { MetaFunction } from "@remix-run/node";
-import AudioUploader from "~/components/AudioUploader";
-import TranscriptionControl from "~/components/TranscriptionControl";
-import TranscriptionDisplay from "~/components/TranscriptionDisplay";
-import AudioPreview from "~/components/AudioPreview";
+import AudioUploader from "~/components/audio/AudioUploader";
+import TranscriptionControl from "~/components/transcript/TranscriptionControl";
+import TranscriptionDisplay from "~/components/transcript/TranscriptionDisplay";
+import AudioPreview from "~/components/audio/AudioPreview";
 import { TranscriptionSegment } from '../utils/transcription-formatter';
 import { processSSEStream } from '~/utils/sseUtils';
-import Header from "~/components/Header";
-import Settings from "~/components/Settings";
+import Header from "~/components/shared/Header";
+import Settings from "~/components/settings/Settings";
 import { useOutletContext } from "@remix-run/react";
-import ConfigurationSummary from "~/components/ConfigurationSummary";
+import ConfigurationSummary from "~/components/shared/ConfigurationSummary";
 
 type ContextType = { isDark: boolean; setIsDark: (isDark: boolean) => void };
 

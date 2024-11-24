@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
-import type { TranscriptionSegment } from '../utils/transcription-formatter';
-import { formatTranscription } from '../utils/transcription-formatter';
+import type { TranscriptionSegment } from '~/utils/transcription-formatter';
+import { formatTranscription } from '~/utils/transcription-formatter';
 import { FiCopy, FiDownload } from 'react-icons/fi';
 import debounce from 'lodash/debounce';
 
