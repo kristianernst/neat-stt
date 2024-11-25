@@ -4,210 +4,203 @@
 
 /* Theme variables */
 :root {
-  /* Brand Colors */
-  --main-accent: #a2fd07;
-  --gradient-start: #a2fd07; /* Argentinian Blue */
-  --gradient-middle: #a2fd07;
-  --gradient-end: #a2fd07; 
+  /* Brand Colors - Cool blue for light mode */
+  --main-accent: #3B82F6; /* Bright blue */
+  --gradient-start: #3B82F6;
+  --gradient-middle: #2563EB;
+  --gradient-end: #1D4ED8;
 
   --ai-gradient-from: rgb(96, 165, 250);
   --ai-gradient-via: rgb(236, 72, 153);
   --ai-gradient-to: rgb(251, 113, 133);
 
-
-  /* --gradient-start: #63ADF2; /* Argentinian Blue */
-  /* --gradient-middle: #f263c0; */
-  /* --gradient-end: #ff798f;  */
-
   /* Light Mode Background Colors */
-  --bg-primary: #DEE5E5; /* Light Solarized Background */
-  --bg-secondary: #E8EDED; /* Slightly Darker Background */
-  --bg-tertiary: rgba(222, 229, 229, 0.95); /* Transparent Light Background */
-  --modal-overlay: rgba(7, 16, 19, 0.1);
-  --modal-bg: rgba(222, 229, 229, 0.98);
+  --bg-primary: #F8FAFC; /* Very light blue-gray */
+  --bg-secondary: #F1F5F9;
+  --bg-tertiary: rgba(248, 250, 252, 0.95);
+  --modal-overlay: rgba(0, 0, 0, 0.1);
+  --modal-bg: rgba(255, 255, 255, 0.98);
 
-  /* Light Mode Text Colors */
-  --text-primary: #071013; /* Deep Blue-Black */
-  --text-secondary: #2D383C; /* Muted Dark */
-  --text-accent: #256EFF; /* Accent Blue */
+  /* Card backgrounds with subtle blue tint */
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(59, 130, 246, 0.1); /* Blue tinted border */
+  --card-hover: rgba(241, 245, 249, 0.95);
+  --header-bg: rgba(255, 255, 255, 0.8);
 
-  /* UI Elements */
-  --card-bg: rgba(255, 255, 255, 0.7);
-  --card-border: rgba(7, 16, 19, 0.1);
-  --card-hover: rgba(255, 255, 255, 0.85);
+  /* Text Colors - Adjusted for blue theme */
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
+  --text-accent: #2563EB; /* Darker blue for text */
 
   /* Status Colors */
   --error-bg: rgba(239, 68, 68, 0.1);
   --error-border: rgba(239, 68, 68, 0.2);
-  --error-text: #dc2626;
+  --error-text: #DC2626;
   --success-bg: rgba(16, 185, 129, 0.1);
   --success-text: #059669;
 
-  /* Progress & Slider Colors */
-  --progress-bg: rgba(7, 16, 19, 0.1);
-  --slider-bg: rgba(7, 16, 19, 0.1);
-  --slider-track: rgba(7, 16, 19, 0.1);
-  --slider-thumb-shadow: rgba(37, 110, 255, 0.2);
-  --slider-thumb-border: #ffffff;
+  /* Progress & Slider Colors adjusted for blue theme */
+  --progress-bg: rgba(59, 130, 246, 0.1);
+  --slider-bg: rgba(59, 130, 246, 0.1);
+  --slider-track: rgba(59, 130, 246, 0.1);
+  --slider-thumb-shadow: rgba(59, 130, 246, 0.2);
+  --slider-thumb-border: #FFFFFF;
   --slider-track-height: 8px;
   --slider-thumb-size: 24px;
-  --slider-thumb-hover-shadow: rgba(37, 110, 255, 0.3);
+  --slider-thumb-hover-shadow: rgba(59, 130, 246, 0.3);
 
   /* Audio Player Colors */
-  --audio-bg: rgba(255, 255, 255, 0.8);
+  --audio-bg: var(--card-bg);
   --audio-text: var(--text-primary);
   --audio-controls: var(--text-primary);
   --audio-progress: var(--gradient-start);
   --audio-border: var(--card-border);
-  --select-hover: rgba(37, 110, 255, 0.1);
+  --select-hover: rgba(59, 130, 246, 0.1);
 
-  /* Additional Variables */
-  --ring-color: rgba(37, 110, 255, 0.3);
-  --ring-color-hover: #256EFF;
-  --thumb-border: #ffffff;
-  --spinner-border: #256EFF;
-  --spinner-border-secondary: #64B6AC;
-  --text-gray-400: #64748b;
-  --text-gray-500: #475569;
+  /* Shadow Colors - Blue themed */
+  --shadow-color: rgba(59, 130, 246, 0.15);
+  --hover-shadow-color: rgba(59, 130, 246, 0.25);
+  --card-shadow-color: rgba(59, 130, 246, 0.08);
 }
 
 .dark {
-  /* Dark Mode Overrides */
-  --bg-primary: #24272B; /* Raisin Black - Main background */
-  --bg-secondary: #857885; /* Taupe Gray - Secondary background for sections */
-  --bg-tertiary: rgba(38, 38, 38, 0.95); /* Slightly lighter for layering */
+  /* Dark Mode Colors - Keeping the clean green theme */
+  --main-accent: #a2fd07;
+  --gradient-start: #a2fd07;
+  --gradient-middle: #a2fd07;
+  --gradient-end: #a2fd07;
+  
+  --bg-primary: #24272B;
+  --bg-secondary: #857885;
+  --bg-tertiary: rgba(38, 38, 38, 0.95);
   --modal-overlay: rgba(0, 0, 0, 0.7);
-  --modal-bg: #24272B; /* Raisin Black - Modal background */
+  --modal-bg: #24272B;
+  --header-bg: rgba(36, 39, 43, 0.8);
 
-  --text-primary: #F6F7EB; /* Ivory - Main text */
-  --text-secondary: #857885; /* Taupe Gray - Secondary text */
-  --text-accent: #63ADF2; /* Argentinian Blue - Accent color for links and buttons */
-
-  --card-bg: rgba(38, 38, 38, 0.6); /* Dark card background */
+  /* Darker card backgrounds for better contrast */
+  --card-bg: rgba(28, 30, 34, 0.95);
   --card-border: rgba(64, 64, 64, 0.5);
-  --card-hover: rgba(55, 55, 55, 0.6);
+  --card-hover: rgba(32, 34, 38, 0.95);
 
-  /* Status Colors */
-  --error-bg: rgba(239, 68, 68, 0.2);
-  --error-text: #f87171;
-  --success-bg: rgba(52, 211, 153, 0.2);
-  --success-text: #6ee7b7;
+  --text-primary: #F6F7EB;
+  --text-secondary: #857885;
+  --text-accent: #a2fd07;
 
-  /* Progress & Slider Colors */
-  --progress-bg: rgba(55, 55, 55, 0.4);
-  --slider-bg: rgba(38, 38, 38, 0.6);
-  --slider-track: rgba(55, 55, 55, 0.4);
-  --slider-thumb-shadow: rgba(99, 173, 242, 0.2);
-  --slider-thumb-border: #ffffff;
-  --slider-thumb-hover-shadow: rgba(99, 173, 242, 0.3);
+  /* Shadow Colors */
+  --shadow-color: rgba(162, 253, 7, 0.1);
+  --hover-shadow-color: rgba(162, 253, 7, 0.2);
+  --card-shadow-color: rgba(162, 253, 7, 0.03);
 
-  /* Audio Player Colors */
-  --audio-bg: rgba(35, 35, 35, 0.8);
-  --audio-text: #ffffff;
-  --audio-controls: #ffffff;
-  --audio-progress: #63ADF2; /* Argentinian Blue for progress bar */
-  --audio-border: rgba(255, 255, 255, 0.2);
-  --select-hover: rgba(255, 255, 255, 0.1);
-
-  /* Additional Overrides */
-  --ring-color: rgba(255, 255, 255, 0.5);
-  --ring-color-hover: #ffffff;
-  --thumb-border: #ffffff;
-  --spinner-border: #63ADF2;
-  --spinner-border-secondary: #857885;
-  --text-gray-400: #9ca3af;
-  --text-gray-500: #6b7280;
+  /* Audio Player Colors for Dark Mode */
+  --audio-bg: var(--card-bg);
+  --audio-text: var(--text-primary);
+  --audio-controls: var(--text-primary);
+  --audio-progress: var(--gradient-start);
+  --audio-border: var(--card-border);
 }
 
-/* Utility Classes */
-.gradient-text {
-  @apply bg-clip-text text-transparent;
-  background-image: linear-gradient(
-    135deg,
-    var(--gradient-start) 0%,
-    var(--gradient-middle) 50%,
-    var(--gradient-end) 100%
-  );
-}
+@layer components {
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      135deg,
+      var(--gradient-start) 0%,
+      var(--gradient-middle) 50%,
+      var(--gradient-end) 100%
+    );
+  }
 
-.gradient-button {
-  @apply bg-gradient-to-r from-[var(--gradient-start)] via-[var(--gradient-middle)] to-[var(--gradient-end)]
-         text-black
-         hover:shadow-md hover:shadow-[#63ADF2]/10
-         transition-all duration-300;
-}
+  /* Enhanced text shadow for better readability in light mode */
+  :root.light .gradient-text {
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+    font-weight: 600; /* Slightly bolder in light mode */
+  }
 
-.card {
-  @apply rounded-xl backdrop-blur-md
-         bg-[var(--card-bg)]
-         border border-[var(--card-border)]
-         shadow-md shadow-[#63ADF2]/5
-         transition-all duration-300;
-}
+  .gradient-button {
+    @apply bg-gradient-to-r from-[var(--gradient-start)] via-[var(--gradient-middle)] to-[var(--gradient-end)]
+           text-[var(--bg-primary)] transition-all duration-300;
+    box-shadow: 0 4px 6px var(--shadow-color);
+  }
 
-.glass-effect {
-  @apply backdrop-blur-md
-         bg-[var(--card-bg)]
-         border border-[var(--card-border)]
-         shadow-md shadow-[#63ADF2]/5
-         transition-all duration-300;
-}
+  .gradient-button:hover {
+    box-shadow: 0 6px 8px var(--hover-shadow-color);
+  }
 
-/* Removed breathing background */
-.breathing-background {
-  @apply min-h-screen transition-colors duration-300;
-  background-color: var(--bg-primary);
-}
+  .card {
+    @apply rounded-xl backdrop-blur-md
+           bg-[var(--card-bg)]
+           border border-[var(--card-border)]
+           transition-all duration-300;
+    box-shadow: 0 4px 6px var(--card-shadow-color);
+  }
 
-/* Custom scrollbar styles */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
+  .glass-effect {
+    @apply backdrop-blur-md
+           bg-[var(--card-bg)]
+           border border-[var(--card-border)]
+           shadow-md
+           transition-all duration-300;
+  }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: var(--text-secondary);
-  border-radius: 3px;
-}
+  .breathing-background {
+    @apply min-h-screen transition-colors duration-300;
+    background-color: var(--bg-primary);
+  }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: var(--text-primary);
-}
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
 
-/* Additional Utility Classes */
-.hover-glow {
-  @apply transition-all duration-300;
-}
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply rounded;
+    background-color: var(--text-secondary);
+  }
 
-.hover-glow:hover {
-  @apply transform scale-[1.01] shadow-md shadow-[#63ADF2]/10;
-}
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-primary);
+  }
 
-.input-field {
-  @apply bg-[var(--card-bg)]
-         border border-[var(--card-border)]
-         rounded-lg px-4 py-2
-         text-[var(--text-primary)]
-         transition-all duration-300
-         focus:outline-none
-         focus:shadow-[0_0_0_2px_var(--gradient-start)]
-         focus:border-[var(--gradient-start)];
-}
+  .hover-glow {
+    @apply transition-all duration-300;
+  }
 
-.button {
-  @apply px-4 py-2 rounded-lg
-         gradient-button
-         active:scale-[0.98]
-         transition-all duration-300;
-}
+  .hover-glow:hover {
+    @apply transform scale-[1.01] shadow-md;
+  }
 
-.select-field {
-  @apply bg-[var(--card-bg)]
-         border border-[var(--card-border)]
-         rounded-lg px-4 py-2
-         text-[var(--text-primary)]
-         transition-all duration-300
-         hover:bg-[var(--card-hover)]
-         focus:outline-none
-         focus:shadow-[0_0_0_2px_var(--gradient-start)]
-         focus:border-[var(--gradient-start)];
+  .input-field {
+    @apply bg-[var(--card-bg)]
+           border border-[var(--card-border)]
+           rounded-lg px-4 py-2
+           text-[var(--text-primary)]
+           transition-all duration-300
+           focus:outline-none
+           focus:shadow-[0_0_0_2px_var(--gradient-start)]
+           focus:border-[var(--gradient-start)];
+  }
+
+  .button {
+    @apply px-4 py-2 rounded-lg
+           bg-gradient-to-r from-[var(--gradient-start)] via-[var(--gradient-middle)] to-[var(--gradient-end)]
+           text-black
+           transition-all duration-300
+           active:scale-[0.98];
+    box-shadow: 0 4px 6px var(--shadow-color);
+  }
+
+  .button:hover {
+    box-shadow: 0 6px 8px var(--hover-shadow-color);
+  }
+
+  .select-field {
+    @apply bg-[var(--card-bg)]
+           border border-[var(--card-border)]
+           rounded-lg px-4 py-2
+           text-[var(--text-primary)]
+           transition-all duration-300
+           hover:bg-[var(--card-hover)]
+           focus:outline-none
+           focus:shadow-[0_0_0_2px_var(--gradient-start)]
+           focus:border-[var(--gradient-start)];
+  }
 }

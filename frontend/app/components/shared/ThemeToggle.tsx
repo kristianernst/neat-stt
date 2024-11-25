@@ -1,4 +1,5 @@
 import { FiSun, FiMoon } from 'react-icons/fi';
+import Button from './Button';
 
 interface ThemeToggleProps {
   isDark: boolean;
@@ -7,13 +8,10 @@ interface ThemeToggleProps {
 
 export default function ThemeToggle({ isDark, onThemeChange }: ThemeToggleProps) {
   return (
-    <button
+    <Button
       onClick={() => onThemeChange(!isDark)}
-      className="p-2 rounded-full 
-                 bg-[var(--card-bg)]
-                 border border-[var(--card-border)]
-                 hover:scale-110 transition-all duration-300
-                 hover:shadow-lg hover:shadow-purple-500/20"
+      variant="primary"
+      className="p-2 rounded-full hover:scale-110"
       aria-label="Toggle theme"
     >
       {isDark ? (
@@ -21,6 +19,6 @@ export default function ThemeToggle({ isDark, onThemeChange }: ThemeToggleProps)
       ) : (
         <FiMoon className="w-5 h-5 text-[var(--gradient-end)]" />
       )}
-    </button>
+    </Button>
   );
 }

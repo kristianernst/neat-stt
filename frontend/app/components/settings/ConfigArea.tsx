@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import LanguageSelector from "./LanguageSelector";
 import SpeakerCounter from "./SpeakerCounter";
+import Card from '../shared/Card';
 
 interface ConfigAreaProps {
   language: string;
@@ -19,21 +20,21 @@ const ConfigArea = memo(function ConfigArea({
 }: ConfigAreaProps) {
   return (
     <div className="w-full max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="card p-6">
+      <Card>
         <LanguageSelector
           value={language}
           onChange={onLanguageChange}
           disabled={disabled}
         />
-      </div>
+      </Card>
       
-      <div className="card p-6">
+      <Card>
         <SpeakerCounter
           value={numSpeakers}
           onChange={onNumSpeakersChange}
           disabled={disabled}
         />
-      </div>
+      </Card>
     </div>
   );
 });

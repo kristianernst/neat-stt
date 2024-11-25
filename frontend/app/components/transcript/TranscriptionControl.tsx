@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import Button from '../shared/Button';
 
 interface TranscriptionControlProps {
   isLiveMode: boolean;
@@ -20,7 +21,7 @@ export default memo(function TranscriptionControl({
       return {
         onClick: () => {},
         text: 'Stopping Transcription...',
-        className: 'bg-[var(--error-bg)] text-[var(--error-text)]',
+        variant: 'error' as const,
         disabled: true,
       };
     }
@@ -28,29 +29,26 @@ export default memo(function TranscriptionControl({
       return {
         onClick: onStopLive,
         text: 'Stop Transcription',
-        className: 'bg-[var(--error-bg)] text-[var(--error-text)] hover:bg-[var(--error-bg)]/80',
+        variant: 'error' as const,
       };
     }
     return {
       onClick: onStartLive,
       text: 'Start Live Transcription',
-      className: 'gradient-button',
+      variant: 'gradient' as const,
     };
   };
 
   const buttonProps = getButtonProps();
 
   return (
-    <button
+    <Button
       onClick={buttonProps.onClick}
       disabled={buttonProps.disabled || isDisabled}
-      className={`
-        w-full py-3 px-4 rounded-xl text-center transition-all duration-300
-        ${buttonProps.className}
-        disabled:opacity-50 disabled:cursor-not-allowed
-      `}
+      variant={buttonProps.variant}
+      className="w-full py-3"
     >
       {buttonProps.text}
-    </button>
+    </Button>
   );
 });

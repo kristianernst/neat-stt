@@ -1,3 +1,5 @@
+import Button from '../shared/Button';
+
 interface LanguageSelectorProps {
   value: string;
   onChange: (language: string) => void;
@@ -10,13 +12,9 @@ const languages = [
   { value: "spanish", label: "🇪🇸 Spanish" },
   { value: "french", label: "🇫🇷 French" },
   { value: "german", label: "🇩🇪 German" }
-];
+] as const;
 
-export default function LanguageSelector({ 
-  value, 
-  onChange, 
-  disabled 
-}: LanguageSelectorProps) {
+export default function LanguageSelector({ value, onChange, disabled }: LanguageSelectorProps) {
   return (
     <div className="space-y-4">
       <label className="block text-sm font-medium text-[var(--text-primary)]">
@@ -24,21 +22,15 @@ export default function LanguageSelector({
       </label>
       <div className="grid grid-cols-1 gap-2">
         {languages.map((lang) => (
-          <button
+          <Button
             key={lang.value}
             onClick={() => onChange(lang.value)}
             disabled={disabled}
-            className={`
-              px-4 py-3 rounded-lg text-left transition-all
-              border border-[var(--card-border)]
-              ${value === lang.value 
-                ? 'gradient-button text-white' 
-                : 'bg-[var(--card-bg)] text-[var(--text-primary)] hover:bg-[var(--card-hover)] hover:border-[var(--gradient-start)]/50'}
-              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-            `}
+            variant={value === lang.value ? 'gradient' : 'primary'}
+            className="justify-start"
           >
             {lang.label}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

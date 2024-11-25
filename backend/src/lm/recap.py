@@ -4,7 +4,7 @@ from typing import List
 from src.lm.helpers import TextChunker, LLMClient
 from src.configuration.environment import LARGE_LLM_MODEL, SMALL_LLM_MODEL, LARGE_LLM_ENDPOINT, SMALL_LLM_ENDPOINT, O1_LLM_ENDPOINT, O1_LLM_MODEL
 from src.configuration.log import get_logger
-from src.lm.prompts import MEETING_SCRATCHPAD_INST, LECTURE_SCRATCHPAD_INST, MEETING_RECAP_INST, LECTURE_RECAP_INST, MEETING_O1_INST, LECTURE_O1_INST
+from src.lm.prompts import MEETING_SCRATCHPAD_INST, LECTURE_SCRATCHPAD_INST, OTHER_SCRATCHPAD_INST, MEETING_RECAP_INST, LECTURE_RECAP_INST, OTHER_RECAP_INST, MEETING_O1_INST, LECTURE_O1_INST, OTHER_O1_INST
 from src.lm.classifier import TranscriptClassifier
 
 
@@ -38,9 +38,9 @@ class RecapGenerator:
         transcript_type = "meeting"
     else:
       self.logger.info(f"\n\n{'='*10}\nTranscript classified as {transcript_type}\n{'='*10}\n\n")
-      self.recap_inst = LECTURE_RECAP_INST if transcript_type == "lecture" else MEETING_RECAP_INST
-      self.scratchpad_inst = LECTURE_SCRATCHPAD_INST if transcript_type == "lecture" else MEETING_SCRATCHPAD_INST
-      self.reflection_inst = LECTURE_O1_INST if transcript_type == "lecture" else MEETING_O1_INST
+      self.scratchpad_inst = LECTURE_SCRATCHPAD_INST if transcript_type == "lecture" else MEETING_SCRATCHPAD_INST if transcript_type == "meeting" else OTHER_SCRATCHPAD_INST
+      self.reflection_inst = LECTURE_O1_INST if transcript_type == "lecture" else MEETING_O1_INST if transcript_type == "meeting" else OTHER_O1_INST
+      self.recap_inst = LECTURE_RECAP_INST if transcript_type == "lecture" else MEETING_RECAP_INST if transcript_type == "meeting" else OTHER_RECAP_INST
 
     try:
         scratch_pad = self._generate_scratchpad(transcript)
@@ -106,7 +106,7 @@ class RecapGenerator:
           ]
           res = self.small_llm_client.ask(
             messages=conversation,
-            temperature=0.1,
+            temperature=0.0,
             max_tokens=self.max_tokens,
             stream=True,
           )
@@ -132,7 +132,7 @@ class RecapGenerator:
       ] 
       reflection = self.o1_llm_client.ask(
         messages=msgs,
-        temperature=0.3,
+        temperature=0.1,
         max_tokens=self.max_tokens,
         stream=True,
       )
@@ -146,12 +146,11 @@ class RecapGenerator:
     try:
       msgs = [
         {"role": "system", "content": self.recap_inst},
-        {"role": "user", "content": f"Here are the notes:\n{scratchpad}"},
-        {"role": "user", "content": f"Here is the reflection o1 has made:\n{reflection}"},
+        {"role": "user", "content": f"Here are the notes:\n<notes>\n{scratchpad}\n</notes>\nHere is the reflection o1 has made:\n<reflection>\n{reflection}\n</reflection>, use them carefully, be detailed, and do not hallucinate"},
       ]
-      recap = self.large_llm_client.ask(
+      recap = self.o1_llm_client.ask(
         messages=msgs,
-        temperature=0.2,
+        temperature=0.0,
         max_tokens=self.max_tokens,
         stream=True,
       )
@@ -182,7 +181,7 @@ if __name__ == "__main__":
   with open(file_path, "r", encoding="utf-8") as file:
     transcript = file.read()
 
-  recap_generator = RecapGenerator(max_tokens=10_000, max_chunk_length=1800, chunk_strategy="semantic")
+  recap_generator = RecapGenerator(max_tokens=10_000, max_chunk_length=1800, max_context_length=6096, buffer=500, chunk_strategy="semantic")
   res = recap_generator.generate_recap(transcript=transcript)
   end_time = time.time()
   logger.info(f"Summarization completed at {end_time}, took {end_time - start_time} seconds")

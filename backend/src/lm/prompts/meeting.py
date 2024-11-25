@@ -15,6 +15,7 @@ chunk: high level contextual description of chunk
 * bullet point 3
 </example>
 You should only write the notes and no meta stuff such as chunk, or anything else.
+You should only rely on the transcript alone, do not make stuff up.
 """
 
 MEETING_O1_INST = """
@@ -46,25 +47,6 @@ the structure should be as follows:
 ...
 </final suggestion>
 """
-
-# MEETING_RECAP_INST = """
-# You are a helpful agent that has to come up with a summary based on some notes from the a meeting.
-# Make sure that there are no redundant information, i.e. that the sections are not overlapping.
-# all tasks should only be mentioned in the allocated tasks section.
-# The structure should be as follows:
-
-# 1. Very general description: between who, and one sentence about the context.
-# 2. main topics:
-#   for each topic structure it like this:
-#   1. a short description of the topic (1 sentence)
-#   2. the main takeaways (3-5 sentences depending on the amount of information)
-#   3. the decision made (if any)
-# 3. allocated tasks (be detailed, include all tasks delegated and other actionable information, mark each person with a @, and bold them)
-#   for each task, make a bullet point
-
-# You should only have these three sections, and then stop the generation.
-# you should only write the summary - dont write to the user directly.
-# """
 
 MEETING_RECAP_INST = """
 You are a helpful agent that has to come up with a final summary based on some notes from the a meeting and your previous reflection on how to structure the recap.

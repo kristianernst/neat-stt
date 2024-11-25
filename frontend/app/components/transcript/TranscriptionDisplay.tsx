@@ -1,8 +1,24 @@
-import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, memo, useRef } from 'react';
 import type { TranscriptionSegment } from '~/utils/transcription-formatter';
 import { formatTranscription } from '~/utils/transcription-formatter';
 import { FiCopy, FiDownload } from 'react-icons/fi';
 import debounce from 'lodash/debounce';
+import IconButton from '../shared/IconButton';
+import LoadingSpinner from '../shared/LoadingSpinner';
+import Button from '../shared/Button';
+import ScrollableCard from '../shared/ScrollableCard';
+import MarkdownRenderer from '../shared/MarkdownRenderer';
+import Modal from '../shared/Modal';
+import Card from '../shared/Card';
+import ProgressBar from '../shared/ProgressBar';
+import CheckIcon from '../shared/CheckIcon';
+
+const formatTime = (ms: number): string => {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
 
 interface TranscriptionDisplayProps {
   isLiveMode: boolean;
@@ -18,6 +34,11 @@ interface TranscriptionDisplayProps {
   setProgress: React.Dispatch<React.SetStateAction<number>>;
 }
 
+const TranscriptContent = memo(({ segments }: { segments: TranscriptionSegment[] }) => {
+  const content = formatTranscription(segments, 'md');
+  return <MarkdownRenderer content={content} />;
+});
+
 export default memo(function TranscriptionDisplay({
   isLiveMode,
   language,
@@ -32,21 +53,10 @@ export default memo(function TranscriptionDisplay({
   setProgress,
 }: TranscriptionDisplayProps) {
   const [isInitializing, setIsInitializing] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const [copySuccess, setCopySuccess] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
-
-  // Smooth scroll to bottom when new segments are added
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: 'smooth',
-      });
-    }
-  }, [segments]);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const handleCopy = () => {
     const text = segments.map(segment => {
@@ -58,20 +68,14 @@ export default memo(function TranscriptionDisplay({
     }).join('\n');
     navigator.clipboard.writeText(text);
     
-    // Show success state
     setCopySuccess(true);
-    
-    // Reset after animation
     setTimeout(() => {
       setCopySuccess(false);
     }, 2000);
   };
 
   const handleDownload = (format: 'md' | 'txt') => {
-    // Create a deep copy of segments to prevent any state issues
     const segmentsCopy = JSON.parse(JSON.stringify(segments));
-    
-    // Sort segments by start time to ensure correct order
     segmentsCopy.sort((a: TranscriptionSegment, b: TranscriptionSegment) => (a.start || 0) - (b.start || 0));
     
     const formattedContent = formatTranscription(segmentsCopy, format);
@@ -87,14 +91,9 @@ export default memo(function TranscriptionDisplay({
     
     setIsDownloadModalOpen(false);
     setDownloadSuccess(true);
-    
     setTimeout(() => {
       setDownloadSuccess(false);
     }, 2000);
-  };
-
-  const formatTime = (seconds: number): string => {
-    return new Date(seconds * 1000).toISOString().substr(11, 8);
   };
 
   const handleTranscriptionEvent = useCallback((event: MessageEvent) => {
@@ -103,24 +102,18 @@ export default memo(function TranscriptionDisplay({
 
     setSegments(prev => {
       const newSegments = [...prev];
-      // Find the last segment from the same speaker
       const lastSegmentIndex = newSegments.length - 1;
       const lastSegment = lastSegmentIndex >= 0 ? newSegments[lastSegmentIndex] : null;
 
-      // Check if we should merge with the last segment
       if (lastSegment && 
           lastSegment.speaker === data.speaker && 
-          // Only merge if the gap is less than 5 minutes (300 seconds)
           Math.abs(lastSegment.end - data.start) < 300) {
-        
-        // Update the last segment instead of creating a new one
         newSegments[lastSegmentIndex] = {
           ...lastSegment,
           text: `${lastSegment.text} ${data.text}`.trim(),
           end: data.end
         };
       } else {
-        // Add as new segment if it's a different speaker or time gap is too large
         newSegments.push({ ...data });
       }
       
@@ -201,25 +194,10 @@ export default memo(function TranscriptionDisplay({
       return {
         timestamp: timestamp.trim(),
         text: textLines.join(' ').trim(),
-        speaker: 'Speaker', // You might have logic to extract speaker names
+        speaker: 'Speaker',
       } as TranscriptionSegment;
     }).filter(Boolean) as TranscriptionSegment[];
   };
-
-  useEffect(() => {
-    if (scrollRef.current && segments.length > 0) {
-      // Slightly scroll down to hint at scrollability
-      scrollRef.current.scrollTop = 10;
-      
-      // Then smoothly scroll back to top
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({
-          top: 0,
-          behavior: 'smooth'
-        });
-      }, 500);
-    }
-  }, [segments.length === 1]); // Only trigger on first segment
 
   const debouncedSetSegments = useCallback(
     debounce((newSegments: TranscriptionSegment[]) => {
@@ -236,201 +214,83 @@ export default memo(function TranscriptionDisplay({
 
   if (isInitializing && isLiveMode) {
     return (
-      <div className="mt-4 card p-6 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-[var(--spinner-border)] border-t-transparent rounded-full mx-auto mb-4"></div>
+      <Card className="mt-4 text-center">
+        <LoadingSpinner className="mx-auto mb-4" />
         <p className="text-[var(--text-gray-400)]">Initializing transcription...</p>
-        <p className="text-sm text-[var(--text-gray-500)] mt-2">Please wait while we set up the transcription service</p>
-      </div>
+        <p className="text-sm text-[var(--text-gray-500)] mt-2">
+          Please wait while we set up the transcription service
+        </p>
+      </Card>
     );
   }
 
-  // Adjusted rendering logic
   if ((isLoading || isTranscribing) && segments.length === 0) {
-    // Show a loading indicator when transcribing
     return (
-      <div className="mt-4 card p-6 text-center">
-        <div className="animate-spin w-8 h-8 border-4 border-[var(--gradient-start)] border-t-transparent rounded-full mx-auto mb-4"></div>
+      <Card className="mt-4 text-center">
+        <LoadingSpinner className="mx-auto mb-4" />
         <p className="text-[var(--text-secondary)]">Transcribing...</p>
         {isTranscribing && (
-          <div className="mt-4">
-            <div className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full h-2">
-              <div
-                className="bg-[var(--gradient-start)] h-2 rounded-full transition-all duration-200"
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-            <div className="text-right text-[var(--text-secondary)] text-sm mt-1">
-              {progress.toFixed(1)}% completed
-            </div>
-          </div>
+          <ProgressBar progress={progress} />
         )}
-      </div>
+      </Card>
     );
   }
 
-  if (!segments || segments.length === 0) {
-    // If there are no segments and not transcribing, don't display anything
-    return null;
-  }
+  if (!segments || segments.length === 0) return null;
 
   return (
     <div className="mt-4">
       <div className="flex justify-end mb-2 space-x-4">
-        <button
+        <IconButton
+          icon={<FiCopy className="w-5 h-5" />}
+          successIcon={<CheckIcon />}
+          label="Copy"
+          successLabel="Copied!"
           onClick={handleCopy}
-          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] 
-                     focus:outline-none flex items-center space-x-1 group relative"
-          disabled={copySuccess}
-        >
-          <div className="relative w-5 h-5">
-            <FiCopy 
-              className={`w-5 h-5 absolute transition-all duration-300 ${
-                copySuccess ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
-              }`}
-            />
-            <svg 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-              className={`w-5 h-5 absolute transition-all duration-300 ${
-                copySuccess 
-                  ? 'opacity-100 scale-100 text-[var(--success-text)]' 
-                  : 'opacity-0 scale-75'
-              }`}
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </div>
-          <span className={`text-sm transition-colors duration-300 ${
-            copySuccess ? 'text-[var(--success-text)]' : ''
-          }`}>
-            {copySuccess ? 'Copied!' : 'Copy'}
-          </span>
-        </button>
-        <button
+        />
+        <IconButton
+          icon={<FiDownload className="w-5 h-5" />}
+          successIcon={<CheckIcon />}
+          label="Download"
+          successLabel="Downloaded!"
           onClick={() => setIsDownloadModalOpen(true)}
-          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] 
-                     focus:outline-none flex items-center space-x-1 group relative"
-          disabled={downloadSuccess}
-        >
-          <div className="relative w-5 h-5">
-            <FiDownload 
-              className={`w-5 h-5 absolute transition-all duration-300 ${
-                downloadSuccess ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
-              }`}
-            />
-            <svg 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-              className={`w-5 h-5 absolute transition-all duration-300 ${
-                downloadSuccess 
-                  ? 'opacity-100 scale-100 text-[var(--success-text)]' 
-                  : 'opacity-0 scale-75'
-              }`}
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          </div>
-          <span className={`text-sm transition-colors duration-300 ${
-            downloadSuccess ? 'text-[var(--success-text)]' : ''
-          }`}>
-            {downloadSuccess ? 'Downloaded!' : 'Download'}
-          </span>
-        </button>
+        />
       </div>
-      <div ref={scrollRef} className="card p-6 space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar relative">
-        {/* Top gradient fade */}
-        <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-[var(--card-bg)] to-transparent pointer-events-none z-10" />
-        
-        {/* Content */}
-        {segments.map((segment, index) => (
-          <div
-            key={`${segment.speaker}-${segment.start}-${segment.end}`}
-            className="space-y-2 p-3 rounded-lg"
-          >
-            {/* Metadata line (timestamp + speaker) */}
-            <div className="flex items-center gap-2 text-sm">
-              <span className="gradient-text font-mono">
-                {segment.start !== undefined && segment.end !== undefined
-                  ? `[${formatTime(segment.start)} -> ${formatTime(segment.end)}]`
-                  : segment.timestamp || null}
-              </span>
-              {segment.speaker && (
-                <>
-                  <span className="text-[var(--text-secondary)]">•</span>
-                  <span className="font-medium text-[var(--gradient-start)]">
-                    {segment.speaker}
-                  </span>
-                </>
-              )}
-            </div>
+      
+      <ScrollableCard maxHeight="600px">
+        <div className="p-6">
+          <TranscriptContent segments={segments} />
+        </div>
+      </ScrollableCard>
 
-            {/* Text content on new line */}
-            <div className="text-[var(--text-primary)] leading-relaxed font-serif pl-4">
-              {segment.text}
-            </div>
-          </div>
-        ))}
-        
-        {/* Bottom gradient fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[var(--card-bg)] to-transparent pointer-events-none z-10" />
-      </div>
       {isTranscribing && (
-        <div className="mt-4">
-          <div className="w-full bg-[var(--card-bg)] border border-[var(--card-border)] rounded-full h-2">
-            <div
-              className="bg-[var(--gradient-start)] h-2 rounded-full transition-all duration-200"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-          <div className="text-right text-[var(--text-secondary)] text-sm mt-1">
-            {progress.toFixed(1)}% completed
-          </div>
-        </div>
+        <ProgressBar progress={progress} />
       )}
-      {/* Format Selection Modal */}
-      {isDownloadModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div 
-            className="absolute inset-0 bg-[var(--modal-overlay)] backdrop-blur-sm"
-            onClick={() => setIsDownloadModalOpen(false)}
-          />
-          <div className="relative bg-[var(--modal-bg)] card p-6 w-full max-w-sm">
-            <h3 className="text-lg font-medium text-[var(--text-primary)] mb-4">
-              Choose Format
-            </h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => handleDownload('md')}
-                className="w-full p-4 rounded-lg bg-[var(--card-bg)]
-                         border border-[var(--card-border)] 
-                         hover:border-[var(--gradient-start)]/50 
-                         transition-all duration-300
-                         text-left group"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 rounded-lg gradient-button">
-                    <span className="text-white text-lg">.md</span>
-                  </div>
-                  <div>
-                    <div className="font-medium text-[var(--text-primary)]">Markdown</div>
-                    <div className="text-sm text-[var(--text-secondary)]">
-                      Formatted with headers and styling
-                    </div>
-                  </div>
-                </div>
-              </button>
+
+      <Modal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        title="Choose Format"
+        maxWidth="max-w-sm"
+      >
+        <Button
+          onClick={() => handleDownload('md')}
+          variant="primary"
+          className="w-full p-4 text-left"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="p-2 rounded-lg gradient-button">
+              <span className="text-white text-lg">.md</span>
+            </div>
+            <div>
+              <div className="font-medium text-[var(--text-primary)]">Markdown</div>
+              <div className="text-sm text-[var(--text-secondary)]">
+                Formatted with headers and styling
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        </Button>
+      </Modal>
     </div>
   );
 });

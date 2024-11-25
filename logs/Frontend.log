@@ -1,0 +1,31 @@
+
+> dev
+> vite
+
+[warn] Fetcher persistence behavior is changing in React Router v7
+┃ You can use the `v3_fetcherPersist` future flag to opt-in early.
+┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_fetcherPersist
+┗
+[warn] Route discovery/manifest behavior is changing in React Router v7
+┃ You can use the `v3_lazyRouteDiscovery` future flag to opt-in early.
+┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_lazyRouteDiscovery
+┗
+[warn] Relative routing behavior for splat routes is changing in React Router v7
+┃ You can use the `v3_relativeSplatPath` future flag to opt-in early.
+┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_relativeSplatPath
+┗
+[warn] Data fetching is changing to a single fetch in React Router v7
+┃ You can use the `v3_singleFetch` future flag to opt-in early.
+┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_singleFetch
+┗
+[warn] The format of errors thrown on aborted requests is changing in React Router v7
+┃ You can use the `v3_throwAbortReason` future flag to opt-in early.
+┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_throwAbortReason
+┗
+Port 5173 is in use, trying another one...
+Port 5174 is in use, trying another one...
+
+  VITE v5.4.10  ready in 786 ms
+
+  ➜  Local:   http://localhost:5175/
+  ➜  Network: use --host to expose

@@ -15,7 +15,7 @@ export function formatTranscription(segments: TranscriptionSegment[], format: 't
       : segment.timestamp || '';
 
     if (format === 'md') {
-      return `#### ${timestamp}\n**${segment.speaker}:** ${segment.text}\n`;
+      return `### ${timestamp} | ${segment.speaker}: \n\n\n${segment.text}\n\n\n`;
     } else {
       return `${timestamp}\n${segment.speaker}: ${segment.text}\n`;
     }

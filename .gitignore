@@ -6,3 +6,6 @@ frontend/node_modules
 *backend/assets/
 *backend/debug_recordings/*
 test*
+
+
+service_pids.txt
