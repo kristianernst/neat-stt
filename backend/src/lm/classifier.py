@@ -66,22 +66,6 @@ if __name__ == "__main__":
     classifier = TranscriptClassifier(
       LLMClient(model_name=SMALL_LLM_MODEL, base_url=SMALL_LLM_ENDPOINT)
     )
-    # keep stats in a dict
-    
-    # from concurrent.futures import ThreadPoolExecutor, as_completed
-    # stats = {}
-    # start_time = time.time()
-    # with ThreadPoolExecutor(max_workers=10) as executor:
-    #   futures = [executor.submit(classifier.classify, "Hello, how are you?, this lecture will be about the history of the internet") for _ in range(10)]
-    #   for future in as_completed(futures):
-    #     try:
-    #       result = future.result()
-    #       stats[result] = stats.get(result, 0) + 1
-    #     except Exception as e:
-    #       raise
-    
-    # logger.info(stats)
-    # logger.info(f"Time taken: {time.time() - start_time} seconds") # takes 5-6 seconds
     
     # normal loop
     start_time = time.time()

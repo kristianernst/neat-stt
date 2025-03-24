@@ -1,2 +1,19 @@
 INFO:     Will watch for changes in these directories: ['/Users/kristianernst/Work/Learning/projects/neat-stt/backend']
-ERROR:    [Errno 48] Address already in use
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [46154] using WatchFiles
+{"timestamp": "2024-12-07T22:35:39.776856+00:00", "level": "INFO", "logger": "local_stt", "message": "Using device: mps", "module": "stt", "function": "__init__", "line": 39}
+{"timestamp": "2024-12-07T22:35:39.777129+00:00", "level": "INFO", "logger": "local_stt", "message": "Initializing diarization model ...", "module": "diarization", "function": "_init_diarization_model", "line": 21}
+{"timestamp": "2024-12-07T22:35:41.299727+00:00", "level": "INFO", "logger": "local_stt", "message": "Initializing Whisper model 'deepdml/whisper-large-v3-turbo' on device 'mps'", "module": "whisper_transcription", "function": "_init_model", "line": 14}
+{"timestamp": "2024-12-07T22:35:45.420675+00:00", "level": "INFO", "logger": "local_stt", "message": "Model and processor successfully initialized", "module": "whisper_transcription", "function": "_init_model", "line": 23}
+{"timestamp": "2024-12-07T22:35:45.428266+00:00", "level": "INFO", "logger": "local_stt", "message": "TextChunker initialized successfully with strategy: semantic", "module": "chunking", "function": "__init__", "line": 41}
+{"timestamp": "2024-12-07T22:35:45.428349+00:00", "level": "INFO", "logger": "local_stt", "message": "Initializing LLMClient with model: largechat", "module": "client", "function": "__init__", "line": 19}
+{"timestamp": "2024-12-07T22:35:45.434487+00:00", "level": "INFO", "logger": "local_stt", "message": "Initializing LLMClient with model: smallchat", "module": "client", "function": "__init__", "line": 19}
+{"timestamp": "2024-12-07T22:35:45.439302+00:00", "level": "INFO", "logger": "local_stt", "message": "Initializing LLMClient with model: o1-preview", "module": "client", "function": "__init__", "line": 19}
+INFO:     Started server process [46251]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46251]
+INFO:     Stopping reloader process [46154]

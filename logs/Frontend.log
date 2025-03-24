@@ -1,31 +1,4 @@
-
-> dev
-> vite
-
-[warn] Fetcher persistence behavior is changing in React Router v7
-┃ You can use the `v3_fetcherPersist` future flag to opt-in early.
-┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_fetcherPersist
-┗
-[warn] Route discovery/manifest behavior is changing in React Router v7
-┃ You can use the `v3_lazyRouteDiscovery` future flag to opt-in early.
-┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_lazyRouteDiscovery
-┗
-[warn] Relative routing behavior for splat routes is changing in React Router v7
-┃ You can use the `v3_relativeSplatPath` future flag to opt-in early.
-┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_relativeSplatPath
-┗
-[warn] Data fetching is changing to a single fetch in React Router v7
-┃ You can use the `v3_singleFetch` future flag to opt-in early.
-┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_singleFetch
-┗
-[warn] The format of errors thrown on aborted requests is changing in React Router v7
-┃ You can use the `v3_throwAbortReason` future flag to opt-in early.
-┃ -> https://remix.run/docs/en/2.13.1/start/future-flags#v3_throwAbortReason
-┗
-Port 5173 is in use, trying another one...
-Port 5174 is in use, trying another one...
-
-  VITE v5.4.10  ready in 786 ms
-
-  ➜  Local:   http://localhost:5175/
-  ➜  Network: use --host to expose
+dyld[46148]: Library not loaded: /opt/homebrew/opt/icu4c/lib/libicui18n.74.dylib
+  Referenced from: <C0F43F50-B5F8-34FB-8290-0B95295FC5C9> /opt/homebrew/Cellar/node/22.7.0/bin/node
+  Reason: tried: '/opt/homebrew/opt/icu4c/lib/libicui18n.74.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/opt/icu4c/lib/libicui18n.74.dylib' (no such file), '/opt/homebrew/opt/icu4c/lib/libicui18n.74.dylib' (no such file), '/opt/homebrew/Cellar/icu4c@76/76.1_1/lib/libicui18n.74.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/opt/homebrew/Cellar/icu4c@76/76.1_1/lib/libicui18n.74.dylib' (no such file), '/opt/homebrew/Cellar/icu4c@76/76.1_1/lib/libicui18n.74.dylib' (no such file)
+./start_services.sh: line 24: 46148 Abort trap: 6           npm run dev
